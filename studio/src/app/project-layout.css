@@ -1,0 +1,23 @@
+.project-active main { width: 100%; margin: 0; padding: 0; }
+.project-active .project-heading { height: 55px; margin: 0; padding: 0 18px; border-bottom: 1px solid var(--line); }
+.breadcrumbs { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 11px; }
+.breadcrumbs button { padding: 0; border: 0; background: transparent; color: var(--accent); font-size: inherit; }
+.breadcrumbs strong { overflow: hidden; max-width: 50vw; color: var(--text); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.project-meta { color: var(--muted); font: 10px var(--mono); white-space: nowrap; }
+.workbench { display: grid; grid-template-columns: clamp(240px, 22vw, 310px) minmax(0, 1fr) minmax(300px, 26vw); height: calc(100dvh - 92px); min-height: 420px; overflow: hidden; border: 0; border-radius: 0; background: var(--surface); }
+.workbench.dictionary-closed { grid-template-columns: clamp(240px, 22vw, 310px) minmax(0, 1fr); }
+.files-pane, .browser-pane, .dictionary-pane { display: flex; min-width: 0; min-height: 0; flex-direction: column; }
+.files-pane { border-right: 1px solid var(--line); background: #1d1e20; }
+.browser-pane { min-width: 0; background: #151619; }
+.dictionary-pane { position: relative; border-left: 1px solid var(--line); background: #202124; }
+.dictionary-pane[hidden] { display: none; }
+.dictionary-close { width: 27px; height: 27px; padding: 0; font-size: 17px; line-height: 1; }
+.dictionary-actions { display: flex; align-items: center; gap: 4px; }
+.browser-toolbar { display: flex; min-height: 45px; align-items: center; gap: 11px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+.browser-path { display: flex; min-width: 0; flex: 1; align-items: center; gap: 5px; overflow: hidden; }
+.browser-path button { max-width: 150px; overflow: hidden; padding: 3px 4px; border: 0; border-radius: 3px; background: transparent; color: #c8ccd2; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.browser-path button:hover { background: var(--surface-hover); }
+.browser-path .path-current { color: var(--text); font-weight: 700; }
+.path-separator { color: #6f747c; font-size: 11px; }
+.browser-count { color: var(--muted); font: 9px var(--mono); white-space: nowrap; }
+.folder-grid { display: grid; min-height: 0; flex: 1; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); grid-auto-rows: 108px; align-content: start; gap: 8px; overflow: auto; padding: 13px 18px; }

@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="dark">
-    <title>Texture Workbench</title>
+    <link rel="icon" type="image/png" href="./src/app/icon.png">
+    <title>Laccite</title>
   </head>
   <body>
     <div class="app-frame">
@@ -12,15 +13,47 @@
         <a class="home-button" href="#" id="homeButton" aria-label="Volver al inicio"><span aria-hidden="true">‹</span> Volver al inicio</a>
         <a class="brand" href="#" aria-label="Laccite"><span>Laccite</span></a>
         <div class="topbar-project" id="topbarProject" hidden></div>
+        <details class="file-menu" id="fileMenu" hidden>
+          <summary id="fileMenuTrigger" aria-controls="fileMenuOptions" aria-expanded="false"><span class="file-menu-icon file-menu-icon-document" aria-hidden="true"></span>Archivo <span aria-hidden="true">⌄</span></summary>
+          <div class="file-menu-popover" id="fileMenuOptions" role="group" aria-label="Archivo">
+            <button class="file-menu-action" id="addFilesButton" data-file-menu-action type="button">Añadir archivos</button>
+            <button class="file-menu-action" id="exportProjectButton" data-file-menu-action type="button" title="Compilar y descargar el ZIP del proyecto">Compilar</button>
+          </div>
+        </details>
+        <details class="file-menu explorer-menu" id="explorerMenu" hidden inert>
+          <summary id="explorerMenuTrigger" aria-controls="explorerMenuOptions" aria-expanded="false" aria-disabled="true"><span class="file-menu-icon explorer-menu-icon" aria-hidden="true"></span>Explorador <span aria-hidden="true">⌄</span></summary>
+          <div class="file-menu-popover" id="explorerMenuOptions" role="group" aria-label="Explorador">
+            <button class="file-menu-action" id="createFolderButton" data-file-menu-action type="button">Nueva carpeta</button>
+            <button class="file-menu-action" id="cutResourcesButton" data-file-menu-action type="button" aria-label="Cortar selección" disabled>Cortar selección</button>
+            <button class="file-menu-action" id="copyResourcesButton" data-file-menu-action type="button" aria-label="Copiar selección" disabled>Copiar selección</button>
+            <button class="file-menu-action" id="renameResourceButton" data-file-menu-action type="button" aria-label="Renombrar selección" disabled>Renombrar selección</button>
+            <button class="file-menu-action" id="pasteResourcesButton" data-file-menu-action type="button" aria-label="Pegar aquí" hidden>Pegar aquí</button>
+            <button class="file-menu-action" id="exportSelectionButton" data-file-menu-action type="button" title="Exportar solo los recursos seleccionados" disabled>Exportar selección</button>
+          </div>
+        </details>
+        <details class="file-menu settings-menu" id="settingsMenu">
+          <summary id="settingsMenuTrigger" aria-controls="settingsMenuOptions" aria-expanded="false"><span class="file-menu-icon settings-menu-icon" aria-hidden="true"></span>Configuración <span aria-hidden="true">⌄</span></summary>
+          <div class="file-menu-popover" id="settingsMenuOptions" role="group" aria-label="Configuración">
+            <button class="file-menu-action settings-menu-toggle" id="resourceOpenMenuPreference" data-file-menu-action type="button" role="checkbox" aria-checked="true">
+              <span>Mostrar menú al hacer doble clic o pulsar Enter</span>
+              <span class="settings-menu-check" aria-hidden="true">✓</span>
+            </button>
+          </div>
+        </details>
         <nav class="workspace-tabs" id="workspaceTabs" aria-label="Vistas del proyecto" hidden>
           <button class="workspace-tab active" id="managerTab" type="button" aria-current="page"><span aria-hidden="true">▰</span> Gestor</button>
           <button class="workspace-tab" id="openPhotopeaButton" type="button" disabled><span aria-hidden="true">⌁</span> Editor</button>
           <button class="workspace-tab" id="inspectorTab" type="button" disabled><span aria-hidden="true">▧</span> Inspector</button>
         </nav>
         <div class="topbar-actions" id="topbarActions" hidden>
-          <button class="button button-primary" id="exportProjectButton" type="button" title="Exportar el proyecto completo">ZIP del proyecto</button>
-          <button class="button button-quiet" id="addFilesButton" type="button"><span aria-hidden="true">＋</span> Añadir archivos</button>
-          <button class="icon-button" id="showNotesButton" type="button" title="Mostrar notas" aria-label="Mostrar notas" aria-pressed="false"><span aria-hidden="true">▤</span></button>
+          <details class="file-menu notes-menu" id="notesMenu">
+            <summary id="notesMenuTrigger" aria-controls="notesMenuOptions" aria-expanded="false"><span aria-hidden="true">▤</span> Paneles <span aria-hidden="true">⌄</span></summary>
+            <div class="file-menu-popover" id="notesMenuOptions" role="group" aria-label="Paneles del proyecto">
+              <button class="file-menu-action" type="button" data-file-menu-action data-notes-screen="general">Notas generales</button>
+              <button class="file-menu-action" type="button" data-file-menu-action data-notes-screen="todos">Lista de tareas</button>
+              <button class="file-menu-action" type="button" data-file-menu-action data-notes-screen="resources">Notas del archivo</button>
+            </div>
+          </details>
         </div>
       </header>
       <main>
@@ -38,46 +71,49 @@
         <section class="project-view" id="projectView" hidden>
           <div class="project-content" id="projectContent">
           <section class="manager-content" id="managerContent">
-          <div class="manager-toolbar" role="toolbar" aria-label="Acciones de recursos">
-            <button class="toolbar-command" id="createFolderButton" type="button"><span aria-hidden="true">＋</span> Nueva carpeta</button>
-            <span class="toolbar-divider" aria-hidden="true"></span>
-            <button class="toolbar-icon" id="cutResourcesButton" type="button" title="Cortar selección" aria-label="Cortar selección" disabled><span aria-hidden="true">✂</span></button>
-            <button class="toolbar-icon" id="copyResourcesButton" type="button" title="Copiar selección" aria-label="Copiar selección" disabled><span aria-hidden="true">▣</span></button>
-            <button class="toolbar-icon" id="renameResourceButton" type="button" title="Renombrar selección" aria-label="Renombrar selección" disabled><span aria-hidden="true">✎</span></button>
-            <button class="toolbar-icon" id="pasteResourcesButton" type="button" title="Pegar aquí" aria-label="Pegar aquí" hidden><span aria-hidden="true">▤</span></button>
-            <span class="toolbar-divider" aria-hidden="true"></span>
-            <button class="toolbar-command toolbar-export" id="exportSelectionButton" type="button" title="Exportar solo los recursos seleccionados" disabled><span aria-hidden="true">⇩</span> Exportar</button>
-            <span class="toolbar-spacer"></span>
-            <span class="selection-count" id="selectionCount" aria-live="polite">0 seleccionados</span>
-            <label class="manager-search"><span aria-hidden="true">⌕</span><input id="browserSearch" type="search" placeholder="Buscar" aria-label="Buscar en esta carpeta"></label>
-          </div>
           <div class="workbench" id="workbench">
             <aside class="files-pane"><div class="pane-heading"><h2>Archivos del proyecto</h2><button class="icon-button pane-menu" id="toggleFileSearch" type="button" title="Filtrar archivos" aria-label="Filtrar archivos" aria-expanded="false">···</button></div><label class="file-search-wrap"><span aria-hidden="true">⌕</span><input id="fileSearch" type="search" placeholder="Filtrar contenido" aria-label="Filtrar carpetas y archivos"></label><nav class="file-list" id="fileList" aria-label="Árbol del proyecto"></nav></aside>
             <div class="sidebar-resizer" id="sidebarResizer" role="separator" aria-orientation="vertical" aria-label="Ajustar ancho del árbol de archivos" aria-valuemin="144" aria-valuemax="520" aria-valuenow="260" tabindex="0"></div>
-            <section class="browser-pane" aria-label="Explorador del proyecto"><header class="browser-heading"><h1 id="projectName"></h1></header><div class="browser-toolbar"><nav class="browser-path" id="browserPath" aria-label="Ruta del directorio"></nav><span class="browser-count" id="fileCount">0 elementos</span></div><div class="folder-grid" id="folderGrid"></div><footer class="browser-statusbar"><span id="browserStatusCount">0 elementos</span><span id="browserSelectionCount">0 seleccionados</span></footer></section>
-            <aside class="dictionary-pane notes-pane" id="notesPane" aria-label="Notas y tareas del proyecto">
+            <section class="browser-pane" aria-label="Explorador del proyecto"><header class="browser-heading"><h1 id="projectName"></h1><div class="browser-search"><button class="browser-search-toggle" id="browserSearchToggle" type="button" aria-label="Buscar en esta carpeta" aria-controls="browserSearch" aria-expanded="false" title="Buscar"><svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"></circle><path d="m10.5 10.5 3.25 3.25"></path></svg></button><input id="browserSearch" type="search" placeholder="Buscar" aria-label="Buscar en esta carpeta" hidden></div></header><div class="browser-toolbar"><nav class="browser-path" id="browserPath" aria-label="Ruta del directorio"></nav><span class="browser-count" id="fileCount">0 elementos</span></div><div class="folder-grid" id="folderGrid"></div><footer class="browser-statusbar"><span id="browserStatusCount">0 elementos</span><span id="browserSelectionCount">0 seleccionados</span></footer></section>
+            <div class="notes-resizer" id="notesResizer" role="separator" aria-orientation="vertical" aria-label="Ajustar ancho del panel del proyecto" aria-controls="notesPane" aria-valuemin="180" aria-valuemax="520" aria-valuenow="260" tabindex="0" hidden></div>
+            <aside class="dictionary-pane notes-pane" id="notesPane" aria-label="Panel del proyecto" hidden>
               <div class="pane-heading notes-heading">
-                <div><span class="eyebrow">Contexto del proyecto</span><h2>Notas y tareas</h2></div>
-                <button class="icon-button" id="closeNotesButton" type="button" title="Ocultar notas" aria-label="Ocultar panel de notas">×</button>
+                <div><span class="eyebrow">Contexto del proyecto</span><h2 id="notesPanelTitle">Panel del proyecto</h2></div>
+                <button class="icon-button" id="closeNotesButton" type="button" title="Cerrar panel" aria-label="Cerrar panel">×</button>
               </div>
               <div class="notes-content">
-                <section class="notes-section project-notes-section">
-                  <div class="notes-section-heading"><h3>Notas del proyecto</h3><span id="projectNoteStatus" aria-live="polite"></span></div>
-                  <textarea id="projectNoteEditor" rows="5" aria-label="Notas del proyecto" placeholder="Contexto, decisiones o referencias…"></textarea>
+                <section class="notes-view" id="projectMemosView" aria-labelledby="notesPanelTitle" hidden>
+                  <div class="notes-view-toolbar">
+                    <button class="button button-primary button-small" id="projectMemoCreateButton" type="button">Nueva nota</button>
+                    <button class="button button-quiet button-small" id="projectMemoSelectionButton" type="button">Borrar</button>
+                    <button class="button button-danger button-small" id="projectMemoDeleteSelectedButton" type="button" hidden>Eliminar seleccionadas</button>
+                  </div>
+                  <p class="notes-status" id="projectMemoStatus" role="status" aria-live="polite"></p>
+                  <div class="notes-list" id="projectMemoList" aria-label="Notas generales"></div>
                 </section>
-                <section class="notes-section todo-section">
-                  <div class="notes-section-heading"><h3>Lista de tareas</h3><span id="projectTodoStatus" aria-live="polite"></span></div>
+                <section class="notes-view" id="projectTodosView" aria-labelledby="notesPanelTitle" hidden>
+                  <div class="notes-view-toolbar">
+                    <button class="button button-primary button-small" id="todoCreateOrCancelButton" type="button">Nueva tarea</button>
+                    <button class="button button-quiet button-small" id="todoSelectionButton" type="button">Borrar</button>
+                    <button class="button button-danger button-small" id="todoDeleteSelectedButton" type="button" hidden>Eliminar seleccionadas</button>
+                  </div>
                   <form class="todo-form" id="projectTodoForm">
                     <input id="projectTodoInput" type="text" maxlength="240" placeholder="Añadir una tarea…" aria-label="Nueva tarea" required>
-                    <button class="button button-quiet button-small" type="submit" aria-label="Añadir tarea">＋</button>
+                    <button class="button button-quiet button-small" id="projectTodoSubmitButton" type="submit">Añadir</button>
                   </form>
+                  <p class="notes-status" id="projectTodoStatus" role="status" aria-live="polite"></p>
                   <ul class="todo-list" id="projectTodoList" aria-label="Tareas del proyecto"></ul>
                 </section>
-                <section class="notes-section file-notes-section">
-                  <div class="notes-section-heading"><h3>Notas del archivo</h3><span id="resourceNoteStatus" aria-live="polite"></span></div>
-                  <strong class="notes-file-name" id="selectedFileName">Selecciona un archivo</strong>
-                  <small class="notes-file-path" id="selectedFilePath"></small>
-                  <textarea id="resourceNoteEditor" rows="6" aria-label="Notas del archivo seleccionado" placeholder="Selecciona un archivo para escribir una nota…" disabled></textarea>
+                <section class="notes-view" id="resourceMemosView" aria-labelledby="notesPanelTitle" hidden>
+                  <div class="notes-view-toolbar">
+                    <span class="notes-view-hint">Notas agrupadas por archivo</span>
+                  </div>
+                  <div class="selected-resource-prompt" id="selectedResourcePrompt" hidden>
+                    <span id="selectedResourcePromptText"></span>
+                    <button class="button button-primary button-small" id="resourceMemoCreateButton" type="button">Crear primera nota</button>
+                  </div>
+                  <p class="notes-status" id="resourceMemoStatus" role="status" aria-live="polite"></p>
+                  <div class="notes-list" id="resourceMemoList" aria-label="Índice de notas del archivo"></div>
                   <details class="orphan-notes" id="orphanNotesSection" hidden>
                     <summary id="orphanNotesSummary">Notas archivadas</summary>
                     <ul id="orphanNotesList"></ul>
@@ -142,8 +178,19 @@
         <button id="resourceExportAction" type="button"><span aria-hidden="true">⇩</span> Exportar</button>
         <button id="resourceViewAction" type="button"><span aria-hidden="true">◉</span> Ver</button>
         <button id="resourcePhotopeaAction" type="button"><span aria-hidden="true">⌁</span> Abrir en Photopea</button>
+        <button id="resourceDeleteAction" class="danger-action" type="button">Eliminar</button>
       </div>
     </dialog>
-    <script type="module" src="/src/main.ts"></script>
+    <dialog class="item-name-dialog project-delete-dialog resource-delete-dialog" id="resourceDeleteDialog" aria-labelledby="resourceDeleteTitle">
+      <form id="resourceDeleteForm" method="dialog">
+        <h2 id="resourceDeleteTitle">Eliminar recurso</h2>
+        <p id="resourceDeleteMessage"></p>
+        <div class="item-name-actions">
+          <button class="button button-quiet" value="cancel" type="submit" formnovalidate>No</button>
+          <button class="button button-danger" id="resourceDeleteConfirmButton" value="delete" type="submit">Sí, eliminar</button>
+        </div>
+      </form>
+    </dialog>
+    <script type="module" src="/src/app/main.ts"></script>
   </body>
 </html>

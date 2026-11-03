@@ -1,0 +1,37 @@
+.photopea-toolbar { display: flex; height: 46px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 10px 0 14px; border-bottom: 1px solid #383a40; background: #202124; }
+.photopea-toolbar > div { display: flex; min-width: 0; align-items: center; gap: 12px; }
+.photopea-toolbar strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.photopea-toolbar span { color: var(--muted); font-size: 10px; white-space: nowrap; }
+@media (max-width: 1000px) {
+  .workbench { grid-template-columns: minmax(215px, 27vw) minmax(0, 1fr) minmax(275px, 32vw); }
+  .workbench.dictionary-closed { grid-template-columns: minmax(215px, 27vw) minmax(0, 1fr); }
+  .folder-grid { grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); }
+}
+@media (max-width: 640px) {
+  main { width: calc(100% - 24px); padding: 25px 0; }
+  .topbar { height: 48px; padding: 0 12px; }
+  .brand { font-size: 11px; }
+  .topbar-actions { gap: 5px; }
+  .workspace-tab { min-width: 54px; padding: 0 7px; font-size: 9px; }
+  .save-state { display: none; }
+  .button { min-height: 31px; padding: 0 8px; font-size: 9px; }
+  .library-heading { align-items: flex-start; flex-direction: column; margin-bottom: 23px; }
+  .library-actions { width: 100%; }
+  .project-open { grid-template-columns: minmax(0, 1fr) 70px; gap: 8px; padding: 7px 4px; }
+  .project-date { grid-column: 1 / -1; padding-left: 42px; text-align: left; }
+  .project-files-count { text-align: right; }
+  .project-heading { align-items: flex-start; flex-direction: column; }
+  .project-meta { white-space: normal; }
+  .workbench, .workbench.dictionary-closed { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 0; overflow: visible; }
+  .files-pane { min-height: 145px; max-height: 22vh; border-right: 0; border-bottom: 1px solid var(--line); }
+  .notes-resizer { display: none; }
+  .browser-pane { min-height: 360px; }
+  .dictionary-pane { min-height: 360px; border-top: 1px solid var(--line); border-left: 0; }
+  .folder-grid { grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); grid-auto-rows: 108px; gap: 7px; padding: 8px; }
+  .photopea-toolbar { height: 48px; padding: 0 7px; }
+  .photopea-toolbar > div { gap: 5px; }
+  .photopea-toolbar strong { max-width: 27vw; font-size: 9px; }
+  .photopea-toolbar span { max-width: 28vw; overflow: hidden; font-size: 8px; text-overflow: ellipsis; }
+  .photopea-toolbar .button { min-height: 28px; padding: 0 6px; font-size: 8px; }
+}
+

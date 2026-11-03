@@ -19,3 +19,5 @@ Connect this repository to Vercel and deploy from the repository root. The root 
 Project data is stored in the browser's IndexedDB. A deployment serves the app but does not synchronize projects between browsers or devices.
 
 Project notes, checklists, and file notes are stored with the project in IndexedDB and included in full-project ZIP exports. File notes follow resources when they are renamed or moved; notes for removed resources remain archived.
+
+See [docs/ORGANIZATION.md](docs/ORGANIZATION.md) for the repository layout and guidance on where to add or move files.
