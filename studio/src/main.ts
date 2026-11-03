@@ -1,7 +1,37 @@
 import './styles.css';
 import { buildTextureIni, createEmptyDictionary, exportPackage, importPackage, parseTextureIniForProject, validateDictionary } from './archive';
-import { createProject, deleteProjectCompletely, getProject, getProjectFiles, getProjectTextureMappings, listProjects, saveProject, saveProjectFile, saveProjectFiles, saveProjectResources } from './storage';
-import type { ProjectFile, ProjectRecord, TextureDictionary, TextureMappingRecord } from './types';
+import {
+  createProject,
+  deleteProjectCompletely,
+  deleteProjectTodo,
+  getProject,
+  getProjectFile,
+  getProjectFiles,
+  getProjectNote,
+  getProjectResourceNotes,
+  getProjectTodos,
+  getProjectTextureMappings,
+  listProjects,
+  saveProject,
+  saveProjectFile,
+  saveProjectFiles,
+  saveProjectNote,
+  saveProjectResources,
+  saveProjectTodo,
+  saveResourceNote
+} from './storage';
+import { createPhotopeaSource, hashBlob, PhotopeaSessionRegistry, type PhotopeaDocumentSession, type PhotopeaImageFormat } from './photopea-session';
+import { savePhotopeaDocument } from './photopea-save';
+import type {
+  ProjectFile,
+  ProjectNoteRecord,
+  ProjectNotesBundle,
+  ProjectRecord,
+  ProjectTodoRecord,
+  ResourceNoteRecord,
+  TextureDictionary,
+  TextureMappingRecord
+} from './types';
 
 interface ProjectTreeNode {
   name: string;
@@ -15,6 +45,25 @@ interface ProjectTreeNode {
 interface ClipboardResource {
   path: string;
   directory: boolean;
+}
+
+interface PhotopeaOpenRequest {
+  project: ProjectRecord;
+  file: ProjectFile;
+  output: { format: PhotopeaImageFormat; mimeType: string };
+}
+
+interface PhotopeaOpening {
+  session: PhotopeaDocumentSession;
+  label: string;
+}
+
+interface PendingPhotopeaSave {
+  session?: PhotopeaDocumentSession;
+  photopeaDone: boolean;
+  writeComplete: boolean;
+  error?: string;
+  statusMessage?: string;
 }
 
 const libraryView = document.querySelector<HTMLElement>('#libraryView')!;
@@ -56,26 +105,33 @@ const fileList = document.querySelector<HTMLElement>('#fileList')!;
 const folderGrid = document.querySelector<HTMLElement>('#folderGrid')!;
 const browserPath = document.querySelector<HTMLElement>('#browserPath')!;
 const workbench = document.querySelector<HTMLElement>('#workbench')!;
-const dictionaryPane = document.querySelector<HTMLElement>('#dictionaryPane')!;
-const showDictionaryButton = document.querySelector<HTMLButtonElement>('#showDictionaryButton')!;
-const closeDictionaryButton = document.querySelector<HTMLButtonElement>('#closeDictionaryButton')!;
+const notesPane = document.querySelector<HTMLElement>('#notesPane')!;
+const showNotesButton = document.querySelector<HTMLButtonElement>('#showNotesButton')!;
+const closeNotesButton = document.querySelector<HTMLButtonElement>('#closeNotesButton')!;
 const fileSearch = document.querySelector<HTMLInputElement>('#fileSearch')!;
 const filesPane = document.querySelector<HTMLElement>('.files-pane')!;
 const toggleFileSearchButton = document.querySelector<HTMLButtonElement>('#toggleFileSearch')!;
 const sidebarResizer = document.querySelector<HTMLElement>('#sidebarResizer')!;
 const selectedFileName = document.querySelector<HTMLElement>('#selectedFileName')!;
-const selectedFileKind = document.querySelector<HTMLElement>('#selectedFileKind')!;
-const assetFacts = document.querySelector<HTMLElement>('#assetFacts')!;
-const dictionaryEditor = document.querySelector<HTMLTextAreaElement>('#dictionaryEditor')!;
-const dictionaryStatus = document.querySelector<HTMLElement>('#dictionaryStatus')!;
-const dictionaryAssetCount = document.querySelector<HTMLElement>('#dictionaryAssetCount')!;
-const saveDictionaryButton = document.querySelector<HTMLButtonElement>('#saveDictionaryButton')!;
+const selectedFilePath = document.querySelector<HTMLElement>('#selectedFilePath')!;
+const projectNoteEditor = document.querySelector<HTMLTextAreaElement>('#projectNoteEditor')!;
+const projectNoteStatus = document.querySelector<HTMLElement>('#projectNoteStatus')!;
+const projectTodoForm = document.querySelector<HTMLFormElement>('#projectTodoForm')!;
+const projectTodoInput = document.querySelector<HTMLInputElement>('#projectTodoInput')!;
+const projectTodoList = document.querySelector<HTMLUListElement>('#projectTodoList')!;
+const projectTodoStatus = document.querySelector<HTMLElement>('#projectTodoStatus')!;
+const resourceNoteEditor = document.querySelector<HTMLTextAreaElement>('#resourceNoteEditor')!;
+const resourceNoteStatus = document.querySelector<HTMLElement>('#resourceNoteStatus')!;
+const orphanNotesSection = document.querySelector<HTMLDetailsElement>('#orphanNotesSection')!;
+const orphanNotesSummary = document.querySelector<HTMLElement>('#orphanNotesSummary')!;
+const orphanNotesList = document.querySelector<HTMLUListElement>('#orphanNotesList')!;
 const saveState = document.querySelector<HTMLElement>('#saveState')!;
 const openPhotopeaButton = document.querySelector<HTMLButtonElement>('#openPhotopeaButton')!;
 const photopeaFrame = document.querySelector<HTMLIFrameElement>('#photopeaFrame')!;
 const photopeaFileName = document.querySelector<HTMLElement>('#photopeaFileName')!;
 const photopeaStatus = document.querySelector<HTMLElement>('#photopeaStatus')!;
 const saveFromPhotopeaButton = document.querySelector<HTMLButtonElement>('#saveFromPhotopeaButton')!;
+const photopeaLoadingOverlay = document.querySelector<HTMLElement>('#photopeaLoadingOverlay')!;
 const inspectorImage = document.querySelector<HTMLImageElement>('#inspectorImage')!;
 const inspectorFileName = document.querySelector<HTMLElement>('#inspectorFileName')!;
 const inspectorFilePath = document.querySelector<HTMLElement>('#inspectorFilePath')!;
@@ -100,6 +156,7 @@ const resourceActionsName = document.querySelector<HTMLElement>('#resourceAction
 const resourceActionKind = document.querySelector<HTMLElement>('#resourceActionKind')!;
 const resourceRenameAction = document.querySelector<HTMLButtonElement>('#resourceRenameAction')!;
 const resourceOpenFolderAction = document.querySelector<HTMLButtonElement>('#resourceOpenFolderAction')!;
+const resourceNotesAction = document.querySelector<HTMLButtonElement>('#resourceNotesAction')!;
 const resourceCopyAction = document.querySelector<HTMLButtonElement>('#resourceCopyAction')!;
 const resourceCutAction = document.querySelector<HTMLButtonElement>('#resourceCutAction')!;
 const resourceExportAction = document.querySelector<HTMLButtonElement>('#resourceExportAction')!;
@@ -113,18 +170,24 @@ let selectedLibraryProject: ProjectRecord | undefined;
 let activeFiles: ProjectFile[] = [];
 let activeDictionary: TextureDictionary | undefined;
 let activeTextureMappings: TextureMappingRecord[] = [];
+let activeProjectNote: ProjectNoteRecord | undefined;
+let activeProjectTodos: ProjectTodoRecord[] = [];
+let activeResourceNotes: ResourceNoteRecord[] = [];
+let displayedResourceId = '';
 let selectedPath = '';
 const selectedItems = new Set<string>();
 let selectionAnchor = '';
 let selectedDirectory = '';
 let expandedDirectories = new Set<string>(['']);
-let editorTimer = 0;
+let projectNoteTimer = 0;
+let resourceNoteTimer = 0;
+let pendingResourceNote: ResourceNoteRecord | undefined;
 const photopeaOrigin = 'https://www.photopea.com';
-let photopeaFilePath = '';
-let photopeaOutputFormat = 'png';
-let photopeaPhase: 'closed' | 'booting' | 'opening' | 'ready' | 'saving' = 'closed';
-let pendingPhotopeaSave = false;
-let photopeaOpenBuffer: ArrayBuffer | undefined;
+const photopeaSessions = new PhotopeaSessionRegistry();
+const photopeaOpenQueue: PhotopeaOpenRequest[] = [];
+let photopeaPhase: 'closed' | 'booting' | 'ready' | 'opening' | 'assigning-source' | 'saving' = 'closed';
+let photopeaOpening: PhotopeaOpening | undefined;
+let pendingPhotopeaSave: PendingPhotopeaSave | undefined;
 const previewObjectUrls = new Set<string>();
 let previewUrlsByBlob = new WeakMap<Blob, string>();
 let inspectorObjectUrl = '';
@@ -152,12 +215,12 @@ function setExportInProgress(inProgress: boolean, message = ''): void {
   exportProjectButton.disabled = inProgress;
   filesInput.disabled = inProgress;
   addFilesButton.disabled = inProgress;
-  showDictionaryButton.disabled = inProgress;
-  saveDictionaryButton.disabled = inProgress;
-  dictionaryEditor.readOnly = inProgress;
+  showNotesButton.disabled = inProgress;
+  projectNoteEditor.readOnly = inProgress;
+  projectTodoInput.disabled = inProgress;
+  resourceNoteEditor.readOnly = inProgress;
   saveFromPhotopeaButton.disabled = inProgress || photopeaPhase !== 'ready';
   if (inProgress) {
-    window.clearTimeout(editorTimer);
     setSaveState(message, 'busy');
   }
   updateSelectedFileDetails();
@@ -180,6 +243,7 @@ function makeDictionaryFile(project: ProjectRecord, dictionary: TextureDictionar
   const text = `${JSON.stringify(dictionary, null, 2)}\n`;
   return {
     projectId: project.id,
+    resourceId: activeFiles.find(file => file.path === project.dictionaryPath)?.resourceId ?? newId(),
     path: project.dictionaryPath,
     blob: new Blob([text], { type: 'text/plain;charset=utf-8' }),
     mimeType: 'text/plain',
@@ -306,7 +370,7 @@ async function importZipFile(file: File): Promise<void> {
     texturesIniPath: imported.texturesIniPath,
     texturesIniHeader: imported.texturesIniHeader
   };
-  await createProject(project, imported.files, imported.textureMappings);
+  await createProject(project, imported.files, imported.textureMappings, imported.notes);
   await openProject(id);
   await requestPersistentStorage();
   setLibraryStatus(`Proyecto creado desde ${file.name}. El ZIP original no se modificó.`);
@@ -328,7 +392,19 @@ async function openProject(projectId: string): Promise<void> {
   clearPreviewObjectUrls();
   activeProject = project;
   activeFiles = await getProjectFiles(projectId);
-  activeTextureMappings = await getProjectTextureMappings(projectId);
+  [activeTextureMappings, activeProjectNote, activeProjectTodos, activeResourceNotes] = await Promise.all([
+    getProjectTextureMappings(projectId),
+    getProjectNote(projectId),
+    getProjectTodos(projectId),
+    getProjectResourceNotes(projectId)
+  ]);
+  projectNoteEditor.value = activeProjectNote?.content ?? '';
+  projectNoteStatus.textContent = '';
+  projectTodoStatus.textContent = '';
+  resourceNoteStatus.textContent = '';
+  renderProjectTodos();
+  renderOrphanNotes();
+  displayedResourceId = '';
   if (!activeProject.texturesIniPath) {
     const iniFile = activeFiles.find(file => file.path.split('/').at(-1)?.toLowerCase() === 'textures.ini');
     if (iniFile) {
@@ -361,32 +437,28 @@ async function openProject(projectId: string): Promise<void> {
   setFilesPaneWidth(filesPane.getBoundingClientRect().width || 240);
   browserSearch.value = '';
   const sidecar = activeFiles.find(file => file.path === project.dictionaryPath);
+  let dictionaryText: string;
   if (!sidecar) {
     const created = makeDictionaryFile(project, createEmptyDictionary());
     await saveProjectFile(project, created);
     activeFiles.push(created);
     activeProject = { ...activeProject, fileCount: activeFiles.length };
     await saveProject(activeProject);
-    dictionaryEditor.value = await created.blob.text();
+    dictionaryText = await created.blob.text();
   } else {
-    dictionaryEditor.value = await sidecar.blob.text();
+    dictionaryText = await sidecar.blob.text();
   }
   updateProjectMeta();
   try {
-    activeDictionary = validateDictionary(dictionaryEditor.value);
-    updateDictionaryCount();
-    dictionaryStatus.textContent = project.dictionaryPath;
-    dictionaryStatus.classList.remove('error');
+    activeDictionary = validateDictionary(dictionaryText);
   } catch {
     activeDictionary = undefined;
-    dictionaryStatus.textContent = 'Diccionario no válido; corrige el JSON para guardar.';
-    dictionaryStatus.classList.add('error');
   }
-  setDictionaryVisible(false);
+  setNotesVisible(false);
   updateSelectionToolbar();
   updateSelectedFileDetails();
   renderProjectExplorer();
-  setSaveState('Guardado local');
+  setSaveState(activeDictionary ? 'Guardado local' : 'Diccionario no válido; se conserva sin modificar', activeDictionary ? 'saved' : 'error');
 }
 
 function buildProjectTree(): ProjectTreeNode {
@@ -515,9 +587,7 @@ function updateSelectedFileDetails(): void {
     ? activeFiles.find(item => item.path === selectedFiles[0])
     : undefined;
   if (!file) {
-    selectedFileName.textContent = selectedItems.size ? `${selectedItems.size} recursos seleccionados` : 'Selecciona una textura';
-    selectedFileKind.textContent = '';
-    assetFacts.textContent = '';
+    updateResourceNoteEditor(undefined);
     openPhotopeaButton.disabled = true;
     inspectorTab.disabled = true;
     return;
@@ -526,12 +596,211 @@ function updateSelectedFileDetails(): void {
   openPhotopeaButton.disabled = !supportedPhotopeaImage;
   openPhotopeaButton.disabled = exportInProgress || !supportedPhotopeaImage;
   inspectorTab.disabled = exportInProgress || !isPreviewableImage(file);
-  selectedFileName.textContent = file.path.split('/').at(-1) ?? file.path;
-  selectedFileKind.textContent = file.kind === 'dictionary' ? 'DICCIONARIO' : file.mimeType || 'ARCHIVO';
-  const asset = activeDictionary?.assets.find(item => item.path === file.path);
-  assetFacts.textContent = asset
-    ? `${asset.hashes.length} hashes · ${asset.name || 'Sin nombre descriptivo'}${asset.tags.length ? ` · ${asset.tags.join(', ')}` : ''}${asset.description ? ` · ${asset.description}` : ''}`
-    : file.kind === 'dictionary' ? 'Metadata portable del proyecto.' : 'Sin ficha de diccionario asociada.';
+  updateResourceNoteEditor(file);
+}
+
+function updateResourceNoteEditor(file: ProjectFile | undefined): void {
+  const resourceId = file?.resourceId ?? '';
+  if (resourceId === displayedResourceId && (file?.path ?? '') === selectedFilePath.textContent) return;
+  void flushResourceNoteSave().catch(error => {
+    resourceNoteStatus.textContent = errorMessage(error);
+    resourceNoteStatus.classList.add('error');
+  });
+  displayedResourceId = resourceId;
+  selectedFileName.textContent = file?.path.split('/').at(-1) ?? (selectedItems.size ? `${selectedItems.size} recursos seleccionados` : 'Selecciona un archivo');
+  selectedFilePath.textContent = file?.path ?? '';
+  resourceNoteEditor.value = file?.resourceId
+    ? activeResourceNotes.find(note => note.resourceId === file.resourceId)?.content ?? ''
+    : '';
+  resourceNoteEditor.disabled = !file || exportInProgress;
+  resourceNoteStatus.textContent = '';
+  resourceNoteStatus.classList.remove('error');
+}
+
+function renderProjectTodos(): void {
+  projectTodoList.replaceChildren();
+  for (const todo of activeProjectTodos) {
+    const item = document.createElement('li');
+    item.className = `todo-item${todo.completed ? ' completed' : ''}`;
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = todo.completed;
+    checkbox.disabled = exportInProgress;
+    checkbox.setAttribute('aria-label', `Marcar tarea como ${todo.completed ? 'pendiente' : 'completada'}`);
+    checkbox.addEventListener('change', () => {
+      const updated = { ...todo, completed: checkbox.checked, updatedAt: Date.now() };
+      void saveProjectTodo(updated).then(() => {
+        activeProjectTodos = activeProjectTodos.map(item => item.id === todo.id ? updated : item);
+        renderProjectTodos();
+        projectTodoStatus.textContent = 'Guardado';
+        projectTodoStatus.classList.remove('error');
+        setSaveState('Guardado local');
+      }).catch(error => {
+        projectTodoStatus.textContent = errorMessage(error);
+        projectTodoStatus.classList.add('error');
+      });
+    });
+    const text = document.createElement('span');
+    text.textContent = todo.text;
+    const remove = document.createElement('button');
+    remove.className = 'todo-delete';
+    remove.type = 'button';
+    remove.textContent = '×';
+    remove.title = 'Eliminar tarea';
+    remove.setAttribute('aria-label', `Eliminar tarea: ${todo.text}`);
+    remove.disabled = exportInProgress;
+    remove.addEventListener('click', () => {
+      void deleteProjectTodo(todo.projectId, todo.id).then(() => {
+        activeProjectTodos = activeProjectTodos.filter(item => item.id !== todo.id);
+        renderProjectTodos();
+        projectTodoStatus.textContent = '';
+        projectTodoStatus.classList.remove('error');
+        setSaveState('Guardado local');
+      }).catch(error => {
+        projectTodoStatus.textContent = errorMessage(error);
+        projectTodoStatus.classList.add('error');
+      });
+    });
+    item.append(checkbox, text, remove);
+    projectTodoList.append(item);
+  }
+}
+
+function renderOrphanNotes(): void {
+  const activeResourceIds = new Set(activeFiles.map(file => file.resourceId).filter(Boolean));
+  const orphanNotes = activeResourceNotes.filter(note => !activeResourceIds.has(note.resourceId));
+  orphanNotesSection.hidden = orphanNotes.length === 0;
+  orphanNotesSummary.textContent = `Notas archivadas (${orphanNotes.length})`;
+  orphanNotesList.replaceChildren();
+  for (const note of orphanNotes) {
+    const item = document.createElement('li');
+    const details = document.createElement('details');
+    const summary = document.createElement('summary');
+    summary.textContent = note.lastKnownPath || 'Archivo eliminado';
+    const content = document.createElement('p');
+    content.textContent = note.content || 'Nota vacía';
+    details.append(summary, content);
+    item.append(details);
+    orphanNotesList.append(item);
+  }
+}
+
+function hasPendingResourceNote(resourceId: string): boolean {
+  return pendingResourceNote?.resourceId === resourceId;
+}
+
+async function saveProjectNoteContent(): Promise<void> {
+  if (!activeProject) return;
+  const projectId = activeProject.id;
+  const content = projectNoteEditor.value;
+  await saveProjectNote(projectId, content);
+  if (activeProject?.id !== projectId) return;
+  activeProjectNote = { projectId, content, updatedAt: Date.now() };
+  projectNoteStatus.textContent = 'Guardado';
+  projectNoteStatus.classList.remove('error');
+  setSaveState('Guardado local');
+}
+
+function scheduleProjectNoteSave(): void {
+  window.clearTimeout(projectNoteTimer);
+  projectNoteStatus.textContent = 'Guardando…';
+  projectNoteTimer = window.setTimeout(() => {
+    void saveProjectNoteContent().catch(error => {
+      projectNoteStatus.textContent = errorMessage(error);
+      projectNoteStatus.classList.add('error');
+      setSaveState('Notas sin guardar', 'error');
+    });
+  }, 500);
+}
+
+async function flushProjectNoteSave(): Promise<void> {
+  if (!projectNoteTimer) return;
+  window.clearTimeout(projectNoteTimer);
+  projectNoteTimer = 0;
+  await saveProjectNoteContent();
+}
+
+async function flushResourceNoteSave(): Promise<void> {
+  window.clearTimeout(resourceNoteTimer);
+  resourceNoteTimer = 0;
+  const note = pendingResourceNote;
+  pendingResourceNote = undefined;
+  if (!note) return;
+  try {
+    await saveResourceNote(note);
+  } catch (error) {
+    if (!pendingResourceNote) pendingResourceNote = note;
+    throw error;
+  }
+  if (activeProject?.id !== note.projectId) return;
+  activeResourceNotes = [
+    ...activeResourceNotes.filter(item => item.resourceId !== note.resourceId),
+    { ...note, updatedAt: Date.now() }
+  ];
+  renderOrphanNotes();
+  if (displayedResourceId === note.resourceId) {
+    resourceNoteStatus.textContent = hasPendingResourceNote(note.resourceId) ? 'Guardando…' : 'Guardado';
+    if (!hasPendingResourceNote(note.resourceId)) resourceNoteStatus.classList.remove('error');
+  }
+  setSaveState('Guardado local');
+}
+
+function scheduleResourceNoteSave(): void {
+  if (!activeProject || !displayedResourceId) return;
+  const file = activeFiles.find(item => item.resourceId === displayedResourceId);
+  if (!file?.resourceId) return;
+  pendingResourceNote = {
+    projectId: activeProject.id,
+    resourceId: file.resourceId,
+    lastKnownPath: file.path,
+    content: resourceNoteEditor.value,
+    updatedAt: Date.now()
+  };
+  window.clearTimeout(resourceNoteTimer);
+  resourceNoteStatus.textContent = 'Guardando…';
+  resourceNoteTimer = window.setTimeout(() => {
+    void flushResourceNoteSave().catch(error => {
+      resourceNoteStatus.textContent = errorMessage(error);
+      resourceNoteStatus.classList.add('error');
+      setSaveState('Nota sin guardar', 'error');
+    });
+  }, 500);
+}
+
+async function flushNoteSaves(): Promise<void> {
+  await Promise.all([flushProjectNoteSave(), flushResourceNoteSave()]);
+}
+
+async function buildProjectNotesBundle(): Promise<ProjectNotesBundle> {
+  if (!activeProject) throw new Error('No hay un proyecto activo para exportar sus notas.');
+  const [projectNote, projectTodos, resourceNotes] = await Promise.all([
+    getProjectNote(activeProject.id),
+    getProjectTodos(activeProject.id),
+    getProjectResourceNotes(activeProject.id)
+  ]);
+  return { projectNote, projectTodos, resourceNotes };
+}
+
+async function addProjectTodo(): Promise<void> {
+  if (!activeProject || exportInProgress) return;
+  const text = projectTodoInput.value.trim();
+  if (!text) return;
+  const now = Date.now();
+  const todo: ProjectTodoRecord = {
+    projectId: activeProject.id,
+    id: newId(),
+    text,
+    completed: false,
+    createdAt: now,
+    updatedAt: now
+  };
+  await saveProjectTodo(todo);
+  activeProjectTodos = [...activeProjectTodos, todo];
+  projectTodoInput.value = '';
+  projectTodoStatus.textContent = '';
+  projectTodoStatus.classList.remove('error');
+  renderProjectTodos();
+  setSaveState('Guardado local');
 }
 
 function syncResourceSelectionStyles(): void {
@@ -577,6 +846,7 @@ function openResourceActions(path: string): void {
   resourceActionsName.textContent = resourceName(path);
   resourceRenameAction.disabled = isProtectedResource(path);
   resourceOpenFolderAction.hidden = !directory;
+  resourceNotesAction.hidden = !file;
   resourceCopyAction.disabled = isProtectedResource(path);
   resourceCutAction.disabled = isProtectedResource(path);
   resourceExportAction.disabled = false;
@@ -713,18 +983,13 @@ function selectDirectory(path: string): void {
   renderProjectExplorer();
 }
 
-function updateDictionaryCount(): void {
-  const count = activeDictionary?.assets.length ?? 0;
-  dictionaryAssetCount.textContent = `${count} ficha${count === 1 ? '' : 's'}`;
-}
-
-function setDictionaryVisible(visible: boolean): void {
-  dictionaryPane.hidden = !visible;
+function setNotesVisible(visible: boolean): void {
+  notesPane.hidden = !visible;
   workbench.classList.toggle('dictionary-closed', !visible);
-  showDictionaryButton.hidden = visible;
-  showDictionaryButton.setAttribute('aria-pressed', String(visible));
-  showDictionaryButton.title = visible ? 'Diccionario visible' : 'Mostrar diccionario';
-  showDictionaryButton.setAttribute('aria-label', showDictionaryButton.title);
+  showNotesButton.hidden = visible;
+  showNotesButton.setAttribute('aria-pressed', String(visible));
+  showNotesButton.title = visible ? 'Notas visibles' : 'Mostrar notas';
+  showNotesButton.setAttribute('aria-label', showNotesButton.title);
 }
 
 function selectFile(path: string): void {
@@ -891,19 +1156,21 @@ async function persistResourceChanges(
     filesToSave.push(sidecar);
     nextFiles.set(sidecar.path, sidecar);
   }
+  await flushResourceNoteSave();
   await saveProjectResources(nextProject, filesToSave, removedPaths, updatedTextureMappings.size
     ? { upsert: [...updatedTextureMappings.values()] }
     : undefined);
   activeProject = nextProject;
   activeFiles = [...nextFiles.values()].sort((left, right) => left.path.localeCompare(right.path));
+  activeResourceNotes = activeResourceNotes.map(note => {
+    const updatedFile = filesToSave.find(file => file.resourceId === note.resourceId);
+    return updatedFile ? { ...note, lastKnownPath: updatedFile.path } : note;
+  });
+  renderOrphanNotes();
   if (updatedTextureMappings.size) {
     activeTextureMappings = activeTextureMappings.map(mapping => updatedTextureMappings.get(mapping.id) ?? mapping);
   }
   if (dictionaryChanged) activeDictionary = nextDictionary;
-  if (nextDictionary) {
-    dictionaryEditor.value = `${JSON.stringify(nextDictionary, null, 2)}\n`;
-    updateDictionaryCount();
-  }
   updateProjectMeta();
   renderProjectExplorer();
   setSaveState('Guardado local');
@@ -1062,7 +1329,11 @@ async function pasteResources(): Promise<void> {
     );
     for (const file of sourceFiles) {
       const nextPath = remapResourcePath(file.path, mappings);
-      filesToSave.push({ ...file, path: nextPath });
+      filesToSave.push({
+        ...file,
+        resourceId: operation === 'copy' ? newId() : file.resourceId,
+        path: nextPath
+      });
       if (operation === 'cut') removedPaths.push(file.path);
       occupied.add(nextPath);
     }
@@ -1099,7 +1370,7 @@ async function pasteResources(): Promise<void> {
   renderProjectExplorer();
 }
 
-function outputSettings(path: string): { format: string; mimeType: string } | undefined {
+function outputSettings(path: string): { format: PhotopeaImageFormat; mimeType: string } | undefined {
   const extension = path.split('.').at(-1)?.toLowerCase();
   if (extension === 'jpg' || extension === 'jpeg') return { format: 'jpg', mimeType: 'image/jpeg' };
   if (extension === 'webp') return { format: 'webp', mimeType: 'image/webp' };
@@ -1108,32 +1379,15 @@ function outputSettings(path: string): { format: string; mimeType: string } | un
   return undefined;
 }
 
-async function openSelectedInPhotopea(): Promise<void> {
-  if (!activeProject || !selectedPath) return;
-  const file = activeFiles.find(item => item.path === selectedPath);
-  const output = outputSettings(selectedPath);
-  if (!file || !output) return;
+const photopeaSaveScript = [
+  'var source = app.activeDocument.source.split(":");',
+  'if (source.length === 3 && source[0] === "texture-workbench" && source[1] && ["png", "jpg", "webp", "gif"].indexOf(source[2]) >= 0) {',
+  'app.echoToOE("texture-workbench:save:" + source[1]);',
+  'app.activeDocument.saveToOE(source[2]);',
+  '} else { app.echoToOE("texture-workbench:invalid-source"); }'
+].join('');
 
-  photopeaFilePath = file.path;
-  photopeaOutputFormat = output.format;
-  photopeaOpenBuffer = await file.blob.arrayBuffer();
-  pendingPhotopeaSave = false;
-  photopeaPhase = 'booting';
-  photopeaFileName.textContent = file.path;
-  photopeaStatus.textContent = 'Conectando con Photopea…';
-  saveFromPhotopeaButton.disabled = true;
-
-  const configuration = {
-    environment: {
-      intro: false,
-      localsave: false,
-      customIO: {
-        open: 'app.echoToOE("texture-workbench:open");',
-        save: `app.echoToOE("texture-workbench:save");app.activeDocument.saveToOE("${output.format}");`
-      }
-    },
-    script: `app.activeDocument.source = ${JSON.stringify(file.path)};`
-  };
+function showPhotopeaEditor(): void {
   managerContent.hidden = true;
   editorView.hidden = false;
   inspectorView.hidden = true;
@@ -1143,7 +1397,82 @@ async function openSelectedInPhotopea(): Promise<void> {
   openPhotopeaButton.setAttribute('aria-current', 'page');
   inspectorTab.classList.remove('active');
   inspectorTab.removeAttribute('aria-current');
+}
+
+function initializePhotopea(): void {
+  const configuration = {
+    environment: {
+      intro: false,
+      localsave: false,
+      customIO: {
+        open: 'app.echoToOE("texture-workbench:open");',
+        save: photopeaSaveScript
+      }
+    }
+  };
+  photopeaPhase = 'booting';
+  photopeaLoadingOverlay.hidden = false;
+  photopeaLoadingOverlay.textContent = 'Conectando con Photopea…';
+  photopeaStatus.textContent = 'Conectando con Photopea…';
   photopeaFrame.src = `${photopeaOrigin}#${encodeURIComponent(JSON.stringify(configuration))}`;
+}
+
+async function processNextPhotopeaOpen(): Promise<void> {
+  if (photopeaPhase !== 'ready' || photopeaOpenQueue.length === 0) return;
+  const request = photopeaOpenQueue.shift();
+  if (!request) return;
+
+  photopeaPhase = 'opening';
+  photopeaLoadingOverlay.hidden = false;
+  photopeaLoadingOverlay.textContent = `Abriendo ${request.file.path}…`;
+  photopeaStatus.textContent = `Abriendo ${request.file.path}…`;
+  try {
+    const [buffer, sourceHash] = await Promise.all([
+      request.file.blob.arrayBuffer(),
+      hashBlob(request.file.blob)
+    ]);
+    const session = photopeaSessions.register({
+      projectId: request.project.id,
+      path: request.file.path,
+      format: request.output.format,
+      mimeType: request.output.mimeType,
+      sourceHash
+    });
+    photopeaOpening = {
+      session,
+      label: request.file.path.split('/').at(-1) ?? request.file.path
+    };
+    const target = photopeaFrame.contentWindow;
+    if (!target) throw new Error('No se pudo conectar con el editor Photopea.');
+    target.postMessage(buffer, photopeaOrigin);
+  } catch (error) {
+    if (photopeaOpening) photopeaSessions.remove(photopeaOpening.session.sourceId);
+    photopeaOpening = undefined;
+    photopeaPhase = 'ready';
+    photopeaLoadingOverlay.hidden = true;
+    photopeaStatus.textContent = errorMessage(error);
+    setSaveState('No se pudo abrir Photopea', 'error');
+    await processNextPhotopeaOpen();
+  }
+}
+
+async function openSelectedInPhotopea(): Promise<void> {
+  if (!activeProject || !selectedPath) return;
+  const project = activeProject;
+  const file = activeFiles.find(item => item.path === selectedPath);
+  const output = outputSettings(selectedPath);
+  if (!file || !output) return;
+
+  photopeaOpenQueue.push({ project, file, output });
+  photopeaFileName.textContent = 'Photopea · documentos';
+  showPhotopeaEditor();
+  saveFromPhotopeaButton.disabled = true;
+
+  if (photopeaPhase === 'closed') {
+    initializePhotopea();
+  } else if (photopeaPhase === 'ready') {
+    await processNextPhotopeaOpen();
+  }
 }
 
 function showManagerView(): void {
@@ -1199,97 +1528,115 @@ async function handlePhotopeaMessage(event: MessageEvent): Promise<void> {
   if (event.origin !== photopeaOrigin || event.source !== photopeaFrame.contentWindow) return;
 
   if (event.data === 'done') {
-    if (photopeaPhase === 'booting' && photopeaOpenBuffer) {
-      photopeaPhase = 'opening';
-      photopeaStatus.textContent = 'Abriendo textura…';
-      photopeaFrame.contentWindow?.postMessage(photopeaOpenBuffer, photopeaOrigin);
-      photopeaOpenBuffer = undefined;
-    } else if (photopeaPhase === 'opening') {
+    if (photopeaPhase === 'booting') {
       photopeaPhase = 'ready';
-      saveFromPhotopeaButton.disabled = false;
-      photopeaStatus.textContent = 'Listo · Guardar en Photopea actualiza el proyecto';
-    } else if (photopeaPhase === 'saving') {
+      await processNextPhotopeaOpen();
+    } else if (photopeaPhase === 'opening' && photopeaOpening) {
+      photopeaPhase = 'assigning-source';
+      const { session, label } = photopeaOpening;
+      const script = `app.activeDocument.source = ${JSON.stringify(createPhotopeaSource(session))};app.activeDocument.name = ${JSON.stringify(label)};`;
+      photopeaFrame.contentWindow?.postMessage(script, photopeaOrigin);
+    } else if (photopeaPhase === 'assigning-source' && photopeaOpening) {
+      const opened = photopeaOpening;
+      photopeaOpening = undefined;
       photopeaPhase = 'ready';
-      saveFromPhotopeaButton.disabled = false;
-      photopeaStatus.textContent = 'Textura guardada en el proyecto';
+      photopeaLoadingOverlay.hidden = true;
+      photopeaStatus.textContent = `Abierta: ${opened.label} · usa las pestañas de Photopea para cambiar de documento`;
+      saveFromPhotopeaButton.disabled = exportInProgress;
+      await processNextPhotopeaOpen();
+    } else if (photopeaPhase === 'saving' && pendingPhotopeaSave) {
+      pendingPhotopeaSave.photopeaDone = true;
+      await finishPhotopeaSave();
     }
     return;
   }
 
   if (typeof event.data === 'string') {
-    if (event.data === 'texture-workbench:save') {
-      pendingPhotopeaSave = true;
+    if (event.data.startsWith('texture-workbench:save:')) {
+      if (photopeaPhase !== 'ready' || pendingPhotopeaSave) {
+        photopeaStatus.textContent = 'Espera a que termine la operación actual de Photopea.';
+        return;
+      }
+      const sourceId = event.data.slice('texture-workbench:save:'.length);
+      const session = photopeaSessions.get(sourceId);
+      pendingPhotopeaSave = {
+        session,
+        photopeaDone: false,
+        writeComplete: false,
+        error: session ? undefined : 'No se reconoce el origen de este documento. Ábrelo desde el gestor del proyecto.'
+      };
       photopeaPhase = 'saving';
       saveFromPhotopeaButton.disabled = true;
       photopeaStatus.textContent = 'Recibiendo textura…';
+    } else if (event.data === 'texture-workbench:invalid-source') {
+      photopeaStatus.textContent = 'Este documento no está vinculado a un recurso del proyecto.';
     } else if (event.data === 'texture-workbench:open') {
       photopeaStatus.textContent = 'Abre texturas desde el gestor del proyecto para conservar el vínculo.';
     }
     return;
   }
 
-  if (!(event.data instanceof ArrayBuffer) || !pendingPhotopeaSave || !activeProject || !photopeaFilePath) return;
-  pendingPhotopeaSave = false;
-  const existing = activeFiles.find(file => file.path === photopeaFilePath);
-  if (!existing) {
-    photopeaStatus.textContent = 'El archivo ya no está en el proyecto.';
-    return;
-  }
-
+  if (!(event.data instanceof ArrayBuffer) || photopeaPhase !== 'saving' || !pendingPhotopeaSave) return;
+  const pending = pendingPhotopeaSave;
   try {
-    const blob = new Blob([event.data], { type: outputSettings(photopeaFilePath)?.mimeType ?? 'image/png' });
-    const updated: ProjectFile = { ...existing, blob };
-    await saveProjectFile(activeProject, updated);
-    activeFiles = activeFiles.map(file => file.path === photopeaFilePath ? updated : file);
-    selectedPath = photopeaFilePath;
-    renderProjectExplorer();
-    selectFile(photopeaFilePath);
-    photopeaStatus.textContent = 'Textura guardada en IndexedDB';
+    if (pending.error) throw new Error(pending.error);
+    const session = pending.session;
+    if (!session) throw new Error('No se reconoce el origen de este documento.');
+    const saved = await savePhotopeaDocument(session, event.data, {
+      getProject,
+      getProjectFile,
+      saveProjectFile
+    });
+    photopeaSessions.updateHash(session.sourceId, saved.sourceHash);
+    if (activeProject?.id === saved.project.id) {
+      activeFiles = activeFiles.map(file => file.path === session.path ? saved.file : file);
+      renderProjectExplorer();
+      updateProjectMeta();
+      if (selectedPath === session.path) selectFile(session.path);
+    }
+    pending.statusMessage = `Guardada en ${saved.project.name} · ${session.path}`;
     setSaveState('Guardado local');
   } catch (error) {
-    photopeaStatus.textContent = errorMessage(error);
+    pending.error = errorMessage(error);
     setSaveState('Error al guardar textura', 'error');
+  } finally {
+    pending.writeComplete = true;
+    await finishPhotopeaSave();
   }
+}
+
+async function finishPhotopeaSave(): Promise<void> {
+  const pending = pendingPhotopeaSave;
+  if (!pending || !pending.photopeaDone || !pending.writeComplete) return;
+  pendingPhotopeaSave = undefined;
+  photopeaPhase = 'ready';
+  saveFromPhotopeaButton.disabled = exportInProgress;
+  if (pending.error) {
+    photopeaStatus.textContent = pending.error;
+  } else {
+    photopeaStatus.textContent = pending.statusMessage ?? 'Textura guardada en el proyecto de origen';
+  }
+  await processNextPhotopeaOpen();
 }
 
 function requestPhotopeaSave(): void {
   if (photopeaPhase !== 'ready') return;
-  pendingPhotopeaSave = true;
-  photopeaPhase = 'saving';
-  saveFromPhotopeaButton.disabled = true;
-  photopeaStatus.textContent = 'Solicitando exportación…';
-  const command = `app.echoToOE("texture-workbench:save");app.activeDocument.saveToOE("${photopeaOutputFormat}");`;
-  photopeaFrame.contentWindow?.postMessage(command, photopeaOrigin);
+  photopeaFrame.contentWindow?.postMessage(photopeaSaveScript, photopeaOrigin);
 }
 
 async function saveDictionary(): Promise<void> {
   if (!activeProject) return;
-  const dictionary = validateDictionary(dictionaryEditor.value);
+  if (!activeDictionary) throw new Error('El diccionario del proyecto no es válido y se conserva sin modificar.');
+  const dictionary = activeDictionary;
   const file = makeDictionaryFile(activeProject, dictionary);
-  activeDictionary = dictionary;
   activeFiles = activeFiles.filter(item => item.path !== file.path);
   activeFiles.push(file);
   activeProject = { ...activeProject, fileCount: activeFiles.length, updatedAt: Date.now() };
   await saveProjectFile(activeProject, file);
   await saveProject(activeProject);
   updateProjectMeta();
-  dictionaryStatus.textContent = `Guardado · ${new Date().toLocaleTimeString()}`;
-  dictionaryStatus.classList.remove('error');
   setSaveState('Guardado local');
-  updateDictionaryCount();
   if (selectedPath === file.path) selectFile(file.path);
-}
-
-function handleDictionaryInput(): void {
-  window.clearTimeout(editorTimer);
-  setSaveState('Validando…', 'busy');
-  editorTimer = window.setTimeout(() => {
-    void saveDictionary().catch(error => {
-      dictionaryStatus.textContent = errorMessage(error);
-      dictionaryStatus.classList.add('error');
-      setSaveState('Cambios sin guardar', 'error');
-    });
-  }, 700);
 }
 
 async function addFiles(files: FileList | File[]): Promise<void> {
@@ -1309,7 +1656,14 @@ async function addFiles(files: FileList | File[]): Promise<void> {
     }
     const path = `${directoryPrefix}${name}`;
     existing.add(path.toLowerCase());
-    additions.push({ projectId: activeProject.id, path, blob: source, mimeType: source.type || 'application/octet-stream', kind: 'source' });
+    additions.push({
+      projectId: activeProject.id,
+      resourceId: newId(),
+      path,
+      blob: source,
+      mimeType: source.type || 'application/octet-stream',
+      kind: 'source'
+    });
   }
   if (!additions.length) return;
   activeFiles.push(...additions);
@@ -1318,7 +1672,6 @@ async function addFiles(files: FileList | File[]): Promise<void> {
   const imageFiles = additions.filter(file => file.mimeType.startsWith('image/'));
   if (activeDictionary && imageFiles.length) {
     for (const file of imageFiles) activeDictionary.assets.push({ id: newId(), path: file.path, hashes: [], name: '', tags: [], description: '' });
-    dictionaryEditor.value = `${JSON.stringify(activeDictionary, null, 2)}\n`;
     await saveDictionary();
   }
   updateProjectMeta();
@@ -1331,17 +1684,16 @@ async function exportActiveProject(): Promise<void> {
   setExportInProgress(true, 'Preparando ZIP…');
   try {
     setSaveState('Preparando ZIP…', 'busy');
-    validateDictionary(dictionaryEditor.value);
-    await saveDictionary();
+    await flushNoteSaves();
+    if (activeDictionary) await saveDictionary();
     setSaveState('Generando ZIP…', 'busy');
     const storedFiles = await getProjectFiles(activeProject.id);
     const files = addGeneratedTextureIni(storedFiles, activeTextureMappings);
-    await exportPackage(files, activeProject.directories, activeProject.name);
+    const notes = await buildProjectNotesBundle();
+    await exportPackage(files, activeProject.directories, activeProject.name, notes);
     setSaveState('ZIP exportado');
   } catch (error) {
     setSaveState(errorMessage(error), 'error');
-    dictionaryStatus.textContent = errorMessage(error);
-    dictionaryStatus.classList.add('error');
   } finally {
     setExportInProgress(false);
   }
@@ -1349,11 +1701,27 @@ async function exportActiveProject(): Promise<void> {
 
 async function openLibrary(): Promise<void> {
   if (exportInProgress) return;
+  try {
+    await flushNoteSaves();
+  } catch (error) {
+    setSaveState(`No se pudieron guardar las notas: ${errorMessage(error)}`, 'error');
+    return;
+  }
   clearPreviewObjectUrls();
   activeProject = undefined;
   activeFiles = [];
   activeDictionary = undefined;
   activeTextureMappings = [];
+  activeProjectNote = undefined;
+  activeProjectTodos = [];
+  activeResourceNotes = [];
+  displayedResourceId = '';
+  projectNoteEditor.value = '';
+  resourceNoteEditor.value = '';
+  resourceNoteEditor.disabled = true;
+  renderProjectTodos();
+  renderOrphanNotes();
+  setNotesVisible(false);
   selectedPath = '';
   selectedItems.clear();
   selectionAnchor = '';
@@ -1416,7 +1784,7 @@ projectDetailsForm.addEventListener('submit', event => {
 });
 projectDeleteAction.addEventListener('click', () => {
   if (!selectedLibraryProject) return;
-  projectDeleteMessage.textContent = `Se eliminarán “${selectedLibraryProject.name}” y todos sus archivos y mappings guardados en este navegador. Esta acción no se puede deshacer.`;
+  projectDeleteMessage.textContent = `Se eliminarán “${selectedLibraryProject.name}” y todos sus archivos, mappings, notas y tareas guardados en este navegador. Esta acción no se puede deshacer.`;
   projectActionsDialog.close();
   projectDeleteDialog.showModal();
 });
@@ -1464,8 +1832,18 @@ filesInput.addEventListener('change', () => {
   if (filesInput.files) void addFiles(filesInput.files).catch(error => setSaveState(errorMessage(error), 'error'));
   filesInput.value = '';
 });
-showDictionaryButton.addEventListener('click', () => setDictionaryVisible(true));
-closeDictionaryButton.addEventListener('click', () => setDictionaryVisible(false));
+showNotesButton.addEventListener('click', () => setNotesVisible(true));
+closeNotesButton.addEventListener('click', () => setNotesVisible(false));
+projectNoteEditor.addEventListener('input', scheduleProjectNoteSave);
+resourceNoteEditor.addEventListener('input', scheduleResourceNoteSave);
+projectTodoForm.addEventListener('submit', event => {
+  event.preventDefault();
+  void addProjectTodo().catch(error => {
+    projectTodoStatus.textContent = errorMessage(error);
+    projectTodoStatus.classList.add('error');
+    setSaveState('No se pudo guardar la tarea', 'error');
+  });
+});
 document.querySelector<HTMLButtonElement>('#exportProjectButton')!.addEventListener('click', () => void exportActiveProject());
 createFolderButton.addEventListener('click', () => void createFolder().catch(error => setSaveState(errorMessage(error), 'error')));
 cutResourcesButton.addEventListener('click', () => setResourceClipboard('cut'));
@@ -1481,6 +1859,12 @@ resourceRenameAction.addEventListener('click', () => {
 resourceOpenFolderAction.addEventListener('click', () => {
   resourceActionsDialog.close();
   selectDirectory(resourceActionPath);
+});
+resourceNotesAction.addEventListener('click', () => {
+  resourceActionsDialog.close();
+  selectFile(resourceActionPath);
+  setNotesVisible(true);
+  resourceNoteEditor.focus();
 });
 resourceCopyAction.addEventListener('click', () => {
   setResourceClipboard('copy');
@@ -1511,12 +1895,6 @@ itemNameDialog.addEventListener('close', () => {
   resolveItemName = undefined;
 });
 browserSearch.addEventListener('input', renderProjectExplorer);
-document.querySelector<HTMLButtonElement>('#saveDictionaryButton')!.addEventListener('click', () => {
-  void saveDictionary().catch(error => {
-    dictionaryStatus.textContent = errorMessage(error);
-    dictionaryStatus.classList.add('error');
-  });
-});
 openPhotopeaButton.addEventListener('click', () => {
   managerTab.classList.remove('active');
   void openSelectedInPhotopea().catch(error => {
@@ -1537,7 +1915,6 @@ window.addEventListener('message', event => {
     setSaveState('Error al guardar textura', 'error');
   });
 });
-dictionaryEditor.addEventListener('input', handleDictionaryInput);
 fileSearch.addEventListener('input', renderProjectExplorer);
 sidebarResizer.addEventListener('pointerdown', event => {
   if (event.button !== 0) return;
