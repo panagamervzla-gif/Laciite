@@ -13,10 +13,40 @@ export interface ProjectRecord {
 
 export interface ProjectFile {
   projectId: string;
+  resourceId?: string;
   path: string;
   blob: Blob;
   mimeType: string;
   kind: 'source' | 'dictionary';
+}
+
+export interface ProjectNoteRecord {
+  projectId: string;
+  content: string;
+  updatedAt: number;
+}
+
+export interface ProjectTodoRecord {
+  projectId: string;
+  id: string;
+  text: string;
+  completed: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ResourceNoteRecord {
+  projectId: string;
+  resourceId: string;
+  lastKnownPath: string;
+  content: string;
+  updatedAt: number;
+}
+
+export interface ProjectNotesBundle {
+  projectNote?: ProjectNoteRecord;
+  projectTodos: ProjectTodoRecord[];
+  resourceNotes: ResourceNoteRecord[];
 }
 
 export interface TextureMappingRecord {
@@ -51,6 +81,7 @@ export interface ImportedPackage {
   dictionary: TextureDictionary;
   dictionaryText: string;
   textureMappings: TextureMappingRecord[];
+  notes?: ProjectNotesBundle;
   texturesIniPath?: string;
   texturesIniHeader?: string;
 }

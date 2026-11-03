@@ -1,9 +1,24 @@
 import JSZip from 'jszip';
-import type { DictionaryAsset, ImportedPackage, ProjectFile, TextureDictionary, TextureMappingRecord } from './types';
+import type {
+  DictionaryAsset,
+  ImportedPackage,
+  ProjectFile,
+  ProjectNotesBundle,
+  TextureDictionary,
+  TextureMappingRecord
+} from './types';
 
 const dictionaryFileName = 'texture-dictionary.txt';
 const textureIniFileName = 'textures.ini';
+const projectNotesFileName = 'laccite-project-notes.json';
 const imageExtensions = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tga', 'dds']);
+
+interface ProjectNotesArchive {
+  format: 'laccite-project-notes';
+  version: 1;
+  resources: Array<{ path: string; resourceId: string }>;
+  notes: ProjectNotesBundle;
+}
 
 function normalizePath(path: string): string {
   return path.replaceAll('\\', '/').replace(/^\.\//, '').replace(/^\/+/, '');
@@ -146,9 +161,94 @@ function createDictionary(mappings: TextureMappingRecord[], packagePaths: string
   return { format: 'texture-workbench-dictionary', version: 1, assets };
 }
 
+function parseProjectNotesArchive(text: string, projectId: string): {
+  resources: Map<string, string>;
+  notes: ProjectNotesBundle;
+} {
+  const value: unknown = JSON.parse(text);
+  if (!value || typeof value !== 'object') throw new Error('El archivo de notas del ZIP no contiene un objeto válido.');
+  const archive = value as Partial<ProjectNotesArchive>;
+  if (
+    archive.format !== 'laccite-project-notes'
+    || archive.version !== 1
+    || !Array.isArray(archive.resources)
+    || !archive.notes
+    || !Array.isArray(archive.notes.projectTodos)
+    || !Array.isArray(archive.notes.resourceNotes)
+  ) {
+    throw new Error('El archivo de notas del ZIP tiene un formato que esta versión no reconoce.');
+  }
+  if (
+    archive.resources.some(resource =>
+      !resource
+      || typeof resource.path !== 'string'
+      || !normalizePath(resource.path)
+      || typeof resource.resourceId !== 'string'
+      || !resource.resourceId
+    )
+    || (archive.notes.projectNote !== undefined
+      && (!archive.notes.projectNote || typeof archive.notes.projectNote.content !== 'string'))
+    || archive.notes.projectTodos.some(todo =>
+      !todo
+      || typeof todo.id !== 'string'
+      || !todo.id
+      || typeof todo.text !== 'string'
+      || typeof todo.completed !== 'boolean'
+    )
+    || archive.notes.resourceNotes.some(note =>
+      !note
+      || typeof note.resourceId !== 'string'
+      || !note.resourceId
+      || typeof note.lastKnownPath !== 'string'
+      || typeof note.content !== 'string'
+    )
+  ) {
+    throw new Error('El archivo de notas del ZIP contiene registros incompletos o no válidos.');
+  }
+  const resources = new Map<string, string>();
+  const resourceIds = new Set<string>();
+  for (const resource of archive.resources) {
+    const path = normalizePath(resource.path);
+    if (resources.has(path) || resourceIds.has(resource.resourceId)) {
+      throw new Error(`El archivo de notas del ZIP repite la identidad o ruta del recurso ${path}.`);
+    }
+    resources.set(path, resource.resourceId);
+    resourceIds.add(resource.resourceId);
+  }
+  const notes: ProjectNotesBundle = {
+    projectNote: archive.notes.projectNote
+      ? {
+          projectId,
+          content: archive.notes.projectNote.content,
+          updatedAt: Number(archive.notes.projectNote.updatedAt) || Date.now()
+        }
+      : undefined,
+    projectTodos: archive.notes.projectTodos.map(todo => ({
+        projectId,
+        id: todo.id,
+        text: todo.text,
+        completed: todo.completed,
+        createdAt: Number(todo.createdAt) || Date.now(),
+        updatedAt: Number(todo.updatedAt) || Date.now()
+      })),
+    resourceNotes: archive.notes.resourceNotes.map(note => ({
+        projectId,
+        resourceId: note.resourceId,
+        lastKnownPath: normalizePath(note.lastKnownPath),
+        content: note.content,
+        updatedAt: Number(note.updatedAt) || Date.now()
+      }))
+  };
+  return { resources, notes };
+}
+
 export async function importPackage(file: File, projectId: string): Promise<ImportedPackage> {
   const zip = await JSZip.loadAsync(file);
-  const archiveFiles = Object.entries(zip.files).filter(([, entry]) => !entry.dir);
+  const projectNotesEntry = zip.file(projectNotesFileName);
+  const projectNotesArchive = projectNotesEntry
+    ? parseProjectNotesArchive(await projectNotesEntry.async('string'), projectId)
+    : undefined;
+  const archiveFiles = Object.entries(zip.files).filter(([path, entry]) => !entry.dir && path !== projectNotesFileName);
   const iniEntry = archiveFiles.find(([path]) => path.split('/').at(-1)?.toLowerCase() === textureIniFileName);
   const iniPath = iniEntry?.[0] ?? '';
   const packageRoot = parentPath(iniPath);
@@ -168,11 +268,19 @@ export async function importPackage(file: File, projectId: string): Promise<Impo
     const blob = isDictionary
       ? new Blob([dictionaryText], { type: 'text/plain;charset=utf-8' })
       : new Blob([await zip.file(path)!.async('arraybuffer')], { type: mimeType(path) });
-    files.push({ projectId, path, blob, mimeType: isDictionary ? 'text/plain' : mimeType(path), kind: isDictionary ? 'dictionary' : 'source' });
+    files.push({
+      projectId,
+      resourceId: projectNotesArchive?.resources.get(normalizePath(path)) ?? crypto.randomUUID(),
+      path,
+      blob,
+      mimeType: isDictionary ? 'text/plain' : mimeType(path),
+      kind: isDictionary ? 'dictionary' : 'source'
+    });
   }
   if (!sidecar) {
     files.push({
       projectId,
+      resourceId: crypto.randomUUID(),
       path: dictionaryPath,
       blob: new Blob([dictionaryText], { type: 'text/plain;charset=utf-8' }),
       mimeType: 'text/plain',
@@ -189,6 +297,7 @@ export async function importPackage(file: File, projectId: string): Promise<Impo
     dictionary,
     dictionaryText,
     textureMappings,
+    notes: projectNotesArchive?.notes,
     texturesIniPath: iniEntry?.[0],
     texturesIniHeader: iniEntry ? parsedIni.header : undefined
   };
@@ -202,10 +311,29 @@ export function validateDictionary(text: string): TextureDictionary {
   return parseDictionary(text);
 }
 
-export async function exportPackage(files: ProjectFile[], directories: string[], name: string): Promise<void> {
+export async function exportPackage(
+  files: ProjectFile[],
+  directories: string[],
+  name: string,
+  notes?: ProjectNotesBundle
+): Promise<void> {
   const zip = new JSZip();
+  if (notes && files.some(file => file.path.toLowerCase() === projectNotesFileName.toLowerCase())) {
+    throw new Error(`No se puede exportar: ${projectNotesFileName} está reservado para las notas portables.`);
+  }
   for (const directory of directories) zip.folder(directory);
   for (const file of files) zip.file(file.path, await file.blob.arrayBuffer());
+  if (notes) {
+    const archive: ProjectNotesArchive = {
+      format: 'laccite-project-notes',
+      version: 1,
+      resources: files
+        .filter((file): file is ProjectFile & { resourceId: string } => Boolean(file.resourceId))
+        .map(file => ({ path: file.path, resourceId: file.resourceId })),
+      notes
+    };
+    zip.file(projectNotesFileName, `${JSON.stringify(archive, null, 2)}\n`);
+  }
   const output = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 5 } });
   const url = URL.createObjectURL(output);
   const link = document.createElement('a');

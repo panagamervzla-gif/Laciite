@@ -20,7 +20,7 @@
         <div class="topbar-actions" id="topbarActions" hidden>
           <button class="button button-primary" id="exportProjectButton" type="button" title="Exportar el proyecto completo">ZIP del proyecto</button>
           <button class="button button-quiet" id="addFilesButton" type="button"><span aria-hidden="true">＋</span> Añadir archivos</button>
-          <button class="icon-button" id="showDictionaryButton" type="button" title="Mostrar diccionario" aria-label="Mostrar diccionario" aria-pressed="false"><span aria-hidden="true">◫</span></button>
+          <button class="icon-button" id="showNotesButton" type="button" title="Mostrar notas" aria-label="Mostrar notas" aria-pressed="false"><span aria-hidden="true">▤</span></button>
         </div>
       </header>
       <main>
@@ -55,12 +55,42 @@
             <aside class="files-pane"><div class="pane-heading"><h2>Archivos del proyecto</h2><button class="icon-button pane-menu" id="toggleFileSearch" type="button" title="Filtrar archivos" aria-label="Filtrar archivos" aria-expanded="false">···</button></div><label class="file-search-wrap"><span aria-hidden="true">⌕</span><input id="fileSearch" type="search" placeholder="Filtrar contenido" aria-label="Filtrar carpetas y archivos"></label><nav class="file-list" id="fileList" aria-label="Árbol del proyecto"></nav></aside>
             <div class="sidebar-resizer" id="sidebarResizer" role="separator" aria-orientation="vertical" aria-label="Ajustar ancho del árbol de archivos" aria-valuemin="144" aria-valuemax="520" aria-valuenow="260" tabindex="0"></div>
             <section class="browser-pane" aria-label="Explorador del proyecto"><header class="browser-heading"><h1 id="projectName"></h1></header><div class="browser-toolbar"><nav class="browser-path" id="browserPath" aria-label="Ruta del directorio"></nav><span class="browser-count" id="fileCount">0 elementos</span></div><div class="folder-grid" id="folderGrid"></div><footer class="browser-statusbar"><span id="browserStatusCount">0 elementos</span><span id="browserSelectionCount">0 seleccionados</span></footer></section>
-            <aside class="dictionary-pane" id="dictionaryPane" aria-label="Panel del diccionario"><div class="pane-heading dictionary-heading"><div><span class="eyebrow">Metadata del proyecto</span><h2>Diccionario</h2></div><div class="dictionary-actions"><button class="button button-quiet button-small" id="saveDictionaryButton" type="button">Guardar</button><button class="icon-button" id="closeDictionaryButton" type="button" title="Ocultar diccionario" aria-label="Ocultar panel del diccionario">×</button></div></div><div class="dictionary-selection"><strong id="selectedFileName">Selecciona una textura</strong><span id="selectedFileKind"></span><p id="assetFacts"></p></div><p class="dictionary-hint">Fichero portable: <code>texture-dictionary.txt</code></p><textarea id="dictionaryEditor" spellcheck="false" aria-label="Editor del diccionario del proyecto"></textarea><div class="dictionary-footer"><span id="dictionaryStatus">Esperando proyecto</span><span id="dictionaryAssetCount">0 fichas</span></div></aside>
+            <aside class="dictionary-pane notes-pane" id="notesPane" aria-label="Notas y tareas del proyecto">
+              <div class="pane-heading notes-heading">
+                <div><span class="eyebrow">Contexto del proyecto</span><h2>Notas y tareas</h2></div>
+                <button class="icon-button" id="closeNotesButton" type="button" title="Ocultar notas" aria-label="Ocultar panel de notas">×</button>
+              </div>
+              <div class="notes-content">
+                <section class="notes-section project-notes-section">
+                  <div class="notes-section-heading"><h3>Notas del proyecto</h3><span id="projectNoteStatus" aria-live="polite"></span></div>
+                  <textarea id="projectNoteEditor" rows="5" aria-label="Notas del proyecto" placeholder="Contexto, decisiones o referencias…"></textarea>
+                </section>
+                <section class="notes-section todo-section">
+                  <div class="notes-section-heading"><h3>Lista de tareas</h3><span id="projectTodoStatus" aria-live="polite"></span></div>
+                  <form class="todo-form" id="projectTodoForm">
+                    <input id="projectTodoInput" type="text" maxlength="240" placeholder="Añadir una tarea…" aria-label="Nueva tarea" required>
+                    <button class="button button-quiet button-small" type="submit" aria-label="Añadir tarea">＋</button>
+                  </form>
+                  <ul class="todo-list" id="projectTodoList" aria-label="Tareas del proyecto"></ul>
+                </section>
+                <section class="notes-section file-notes-section">
+                  <div class="notes-section-heading"><h3>Notas del archivo</h3><span id="resourceNoteStatus" aria-live="polite"></span></div>
+                  <strong class="notes-file-name" id="selectedFileName">Selecciona un archivo</strong>
+                  <small class="notes-file-path" id="selectedFilePath"></small>
+                  <textarea id="resourceNoteEditor" rows="6" aria-label="Notas del archivo seleccionado" placeholder="Selecciona un archivo para escribir una nota…" disabled></textarea>
+                  <details class="orphan-notes" id="orphanNotesSection" hidden>
+                    <summary id="orphanNotesSummary">Notas archivadas</summary>
+                    <ul id="orphanNotesList"></ul>
+                  </details>
+                </section>
+              </div>
+            </aside>
           </div>
           </section>
           <section class="editor-view" id="editorView" aria-label="Editor de imágenes" hidden>
-            <header class="photopea-toolbar editor-toolbar"><div><strong id="photopeaFileName">Photopea</strong><span id="photopeaStatus">Selecciona una imagen en el gestor</span></div><button class="button button-quiet button-small" id="saveFromPhotopeaButton" type="button" disabled>Guardar en proyecto</button></header>
+            <header class="photopea-toolbar editor-toolbar"><div><strong id="photopeaFileName">Photopea</strong><span id="photopeaStatus">Selecciona una imagen en el gestor</span></div><button class="button button-quiet button-small" id="saveFromPhotopeaButton" type="button" disabled>Guardar documento activo</button></header>
             <iframe id="photopeaFrame" title="Editor de imágenes Photopea" src="about:blank" allow="clipboard-read; clipboard-write"></iframe>
+            <div class="photopea-loading-overlay" id="photopeaLoadingOverlay" role="status" hidden>Preparando documento de Photopea…</div>
           </section>
           <section class="inspector-view" id="inspectorView" aria-label="Inspector de imagen" hidden>
             <header class="inspector-toolbar"><div><strong id="inspectorFileName">Inspector</strong><span id="inspectorFilePath"></span></div><button class="button button-quiet button-small" id="inspectorOpenEditor" type="button">Abrir en Photopea</button></header>
@@ -106,6 +136,7 @@
       <div class="resource-action-list">
         <button id="resourceRenameAction" type="button"><span aria-hidden="true">✎</span> Cambiar nombre</button>
         <button id="resourceOpenFolderAction" type="button"><span aria-hidden="true">▰</span> Abrir carpeta</button>
+        <button id="resourceNotesAction" type="button"><span aria-hidden="true">▤</span> Ver notas del archivo</button>
         <button id="resourceCopyAction" type="button"><span aria-hidden="true">▣</span> Copiar</button>
         <button id="resourceCutAction" type="button"><span aria-hidden="true">✂</span> Cortar</button>
         <button id="resourceExportAction" type="button"><span aria-hidden="true">⇩</span> Exportar</button>
