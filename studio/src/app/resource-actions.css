@@ -1,0 +1,21 @@
+.resource-actions-dialog { position: fixed; inset: 0; width: min(19rem, calc(100vw - 2rem)); max-width: none; max-height: calc(100dvh - 2rem); margin: auto; overflow: auto; padding: 0; border: 1px solid #41464e; border-radius: .45rem; background: #202226; color: #e7e9ed; box-shadow: 0 1rem 3rem #000a; }
+.resource-actions-dialog::backdrop { background: #08090b88; }
+.resource-actions-dialog > header { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: .75rem; padding: .7rem .8rem; border-bottom: 1px solid #363a40; }
+.resource-actions-dialog > header > div { min-width: 0; }
+.resource-actions-dialog header span { color: #8e9aa8; font: .62rem var(--mono); text-transform: uppercase; }
+.resource-actions-dialog h2 { overflow: hidden; margin: .2rem 0 0; color: #e5e9ee; font-size: .8rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.resource-action-list { display: grid; gap: .1rem; padding: .35rem; }
+.resource-action-list button { display: flex; min-height: 2.2rem; align-items: center; gap: .7rem; padding: .35rem .6rem; border: 0; border-radius: .25rem; background: transparent; color: #d7dce3; font-size: .75rem; text-align: left; }
+.resource-action-list button:hover:not(:disabled) { background: #30343a; }
+.resource-action-list button.danger-action { margin-top: .2rem; border-top: 1px solid #363a40; border-radius: 0; color: #ff9582; }
+.resource-action-list button.danger-action:hover:not(:disabled) { background: #472b2a; color: #ffb0a2; }
+.resource-action-list button:disabled { cursor: default; opacity: .4; }
+.resource-action-list button > span { display: grid; width: 1.2rem; flex: 0 0 auto; place-items: center; color: #9bbbe0; font-size: .95rem; }
+body.exporting { cursor: progress; }
+.project-view.exporting .project-content { filter: brightness(.68); opacity: .78; pointer-events: none; transition: filter .18s ease, opacity .18s ease; }
+.project-view.exporting .project-statusbar { filter: none; opacity: 1; }
+@media (max-width: 700px) {
+  .inspector-toolbar { flex-wrap: wrap; }
+  .inspector-toolbar > div { min-width: 0; flex: 1 1 auto; }
+  .inspector-status { gap: .3rem .75rem; }
+}

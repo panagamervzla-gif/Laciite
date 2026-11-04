@@ -1,0 +1,23 @@
+.photopea-loading-overlay { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; padding: 1rem; background: rgb(18 20 24 / 88%); color: #e6e9ee; font-size: .9rem; text-align: center; }
+.photopea-loading-overlay[hidden] { display: none; }
+.editor-toolbar { min-height: 2.75rem; height: auto; padding: .35rem clamp(.5rem, 1cqi, 1rem); }
+.editor-toolbar > div { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; gap: clamp(.5rem, 1.5cqi, 1rem); }
+.editor-toolbar strong { max-width: 60cqi; overflow: hidden; color: #e6e9ee; font-size: clamp(.68rem, 1.4cqi, .85rem); text-overflow: ellipsis; white-space: nowrap; }
+.editor-toolbar span { overflow: hidden; color: #9da5af; font-size: clamp(.6rem, 1.2cqi, .75rem); text-overflow: ellipsis; white-space: nowrap; }
+.editor-toolbar .button { flex: 0 0 auto; }
+.editor-view iframe { display: block; width: 100%; height: 100%; min-height: 0; border: 0; background: #17181a; }
+@media (max-width: 700px) {
+  .editor-toolbar { flex-wrap: wrap; gap: .3rem; }
+  .editor-toolbar > div { min-height: 1.8rem; flex-basis: 100%; }
+  .editor-toolbar strong { max-width: 48vw; }
+  .editor-toolbar span { flex: 1 1 auto; }
+}
+
+.project-file-card { height: 100%; min-height: 0; justify-content: space-between; gap: clamp(.35rem, 3cqi, .65rem); overflow: visible; padding: clamp(.35rem, 3cqi, .65rem); border: 0; border-radius: .2rem; background: transparent; }
+.project-file-card:hover { border: 0; background: #24272c; }
+.project-file-card.selected { border: 0; outline: 0; background: #20364b; box-shadow: inset .15rem 0 #79baff; }
+.project-file-card.cutting { opacity: .45; }
+.project-file-preview { display: block; width: 100%; height: auto; max-height: calc(100% - 2rem); aspect-ratio: 1; flex: 1 1 auto; border: 0; border-radius: .1rem; object-fit: contain; }
+.project-file-card > span:last-child { flex: 0 0 auto; padding: .15rem .1rem; color: #dce1e8; font: clamp(.62rem, 3.3cqi, .78rem)/1.35 var(--mono); text-align: center; overflow-wrap: anywhere; }
+.project-file-icon { display: grid; width: 100%; min-height: clamp(4rem, 22cqi, 7rem); flex: 1 1 auto; place-items: center; color: #b4c9e1; font-size: clamp(1.4rem, 9cqi, 2.4rem); }
+

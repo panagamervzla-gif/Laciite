@@ -2,4 +2,5 @@
 **/dist/
 .vercel/
 **/.vercel/
+.local/function-docs/
 .DS_Store

@@ -1,0 +1,27 @@
+:root {
+  font-family: 'Manrope', sans-serif;
+  color: #e7e9ed;
+  background: #17181a;
+  --surface: #202124;
+  --surface-raised: #27292d;
+  --surface-hover: #30343a;
+  --line: #3a3d42;
+  --text: #e7e9ed;
+  --muted: #9ba1aa;
+  --accent: #78baff;
+  --accent-soft: #183a5b;
+  --green: #8fca8c;
+  --red: #ff9582;
+  --mono: 'DM Mono', monospace;
+  color-scheme: dark;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+body { min-width: 0; min-height: 100vh; margin: 0; background: #17181a; }
+button, input, textarea { font: inherit; }
+button { color: inherit; cursor: pointer; }
+button:disabled { cursor: default; opacity: .4; }
+[hidden] { display: none !important; }
+.app-frame { min-height: 100vh; }
