@@ -41,6 +41,7 @@ La interfaz existente aún concentra algunas vistas y flujos en `studio/src/app/
 ### Documentación y trabajo en curso
 
 - `docs/ORGANIZATION.md`: esta guía de ubicación y estructura.
+- `docs/AI-HANDOFF.md`: guía de continuidad para agentes de IA, skills disponibles, automatizaciones y flujo de trabajo.
 - `docs/architecture/`: mapas de módulos y decisiones arquitectónicas; el mapa actual es `REFACTOR-MAP.md`.
 - `docs/specifications/`: especificaciones de capacidades y contratos antes de implementarlas.
 - `tasks/`: planes y listas de trabajo activas. No reemplaces una lista incompleta de otra tarea; crea archivos separados y conserva su progreso.
@@ -48,6 +49,7 @@ La interfaz existente aún concentra algunas vistas y flujos en `studio/src/app/
 - `.github/skills/`, `.github/prompts/` y `.github/references/`: personalizaciones de agente agrupadas por tipo.
 - `.vscode/`: configuración del editor para este workspace; no trasladarla a las carpetas de la aplicación.
 - `skillsusage.md`: catálogo de skills del workspace, conservado en la raíz porque las instrucciones actuales lo referencian desde `.github/`.
+- `.local/function-docs/`: guía local y privada de las operaciones disponibles para usuarios; contiene una página por operación y un índice. Está excluida de Git hasta que se prepare la documentación pública de lanzamiento.
 
 ### Datos y archivos especiales de raíz
 

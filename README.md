@@ -21,3 +21,5 @@ Project data is stored in the browser's IndexedDB. A deployment serves the app b
 Project notes, checklists, and file notes are stored with the project in IndexedDB and included in full-project ZIP exports. File notes follow resources when they are renamed or moved; notes for removed resources remain archived.
 
 See [docs/ORGANIZATION.md](docs/ORGANIZATION.md) for the repository layout and guidance on where to add or move files.
+
+For AI-assisted work, see the [agent handoff guide](docs/AI-HANDOFF.md), the [workspace skill catalog](skillsusage.md), and the persistent [Copilot instructions](.github/copilot-instructions.md).
