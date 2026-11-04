@@ -1,90 +1,96 @@
-# Implementation Plan: edición de varias texturas en Photopea
+# Implementation Plan: zoom independiente del Inspector de imágenes
 
 ## Overview
 
-Implementar la especificación aprobada en [SPEC-photopea-multi-document.md](../docs/specifications/SPEC-photopea-multi-document.md): mantener una única instancia de Photopea, abrir varias texturas en documentos nativos, y guardar cada documento en su proyecto y archivo de origen en IndexedDB. La refactorización general de `main.ts` queda fuera de este plan.
+Añadir controles de zoom propios a la vista **Inspector** para ampliar o reducir la imagen sin cambiar el zoom de la página. El Inspector ya presenta previsualización, ruta, dimensiones, formato y tamaño; el zoom debe afectar solo a la imagen y conservar los datos actuales.
 
-## Architecture Decisions
+## Decisiones acordadas
 
-- Mantener un único iframe y una cola serializada para mensajes de apertura y guardado. Photopea confirma cada mensaje con `"done"`; no se enviará el siguiente paso de una apertura hasta recibir la confirmación esperada.
-- Asignar a cada documento un identificador opaco en `Document.source`. Un registro de sesión en memoria relacionará ese identificador con proyecto, ruta, formato de exportación, MIME y huella del contenido original.
-- El script de guardado consultará el `source` del documento activo y enviará identificador y bytes en la misma operación; así el formato y destino corresponden a la pestaña activa aunque cambie la selección en Laccite.
-- Calcular una huella SHA-256 del blob al abrir y contrastarla con el archivo actual antes de escribir. Si el proyecto o el archivo falta o la huella no coincide, rechazar el guardado con un error visible.
-- Mantener los documentos abiertos al navegar entre proyectos. El mapa de sesión permite guardar en el proyecto de origen; las escrituras solo refrescan la vista local si ese mismo proyecto está activo.
-- No crear UI externa de pestañas. El título de la barra de Laccite no afirmará qué pestaña nativa está activa, ya que la API oficial consultada no documenta un evento de cambio de pestaña; el resultado del guardado sí identificará el archivo resuelto.
-- Añadir Vitest y jsdom para pruebas de la máquina de estados y del protocolo; no agregar una capa de pruebas de IndexedDB ni migrar su esquema en esta funcionalidad.
+- Usar controles siempre visibles en el encabezado del Inspector: **−**, porcentaje editable, **+** y **Ajustar**. El control numérico junto con ambos botones da ajuste preciso sin ofrecer dos modos duplicados.
+- No añadir una preferencia al menú **Configuración** para alternar entre slider y botones. Si se quisiera una segunda presentación, debe confirmarse como un alcance aparte.
+- Interpretar 100% como tamaño de píxel nativo; la primera apertura de cada imagen usa **Ajustar** para que quepa en el área visible.
+- El zoom manual afecta únicamente a la previsualización dentro del Inspector. Si la imagen supera el área visible, se puede arrastrar o mover con las flechas del teclado; las barras se ocultan y la página no se escala ni desplaza.
+- Como valor inicial, limitar el zoom a 10%–800% en incrementos de 10%. El porcentaje introducido se valida dentro del mismo rango.
+- Al abrir otra imagen, volver a **Ajustar**. Si la imagen está en modo ajustado, redimensionar la ventana vuelve a calcular ese ajuste; un zoom manual se conserva.
+- Seguir TDD para las reglas de cálculo, actualizar la documentación privada de la operación junto con la interfaz y mantener el inventario exacto.
 
 ## Dependency Graph
 
 ```text
-Vitest/jsdom
-    │
-    ▼
-Registro de documentos y protocolo Photopea (puro y comprobable)
-    │
-    ├── Cola de apertura ──→ iframe único + documentos nativos
-    │
-    └── Correlación de guardado ──→ validación de proyecto/archivo/huella
-                                         │
-                                         ▼
-                                 persistencia IndexedDB existente
+Modelo de escala y límites (puro)
+        │
+        ├── pruebas unitarias de zoom y ajuste a ventana
+        ▼
+Controles accesibles en el Inspector
+        │
+        ├── escala independiente de la página
+        ├── overflow del escenario al ampliar
+        └── comportamiento responsive / cambio de imagen
+        ▼
+Verificación manual en navegador
+        │
+        └── actualizar la ficha privada y el índice a 42 operaciones
 ```
-
-La API Live Messaging de Photopea y su semántica de `"done"`, `Document.source`, `echoToOE` y `saveToOE` se citan en la especificación. La prueba manual en navegador es obligatoria porque el protocolo real depende del servicio externo.
 
 ## Task List
 
-### Phase 1: Protocol foundation
+### Phase 1: Zoom model
 
-- [x] Task 1: Add Vitest/jsdom and implement a testable Photopea session registry.
-- [x] Task 2: Reuse the iframe and open sequential documents through native Photopea tabs. Browser verification remains pending.
+- [x] Task 1: Define and test zoom calculations, input validation, bounds, and fit-to-stage behavior.
 
-### Checkpoint: Open multiple documents
+### Checkpoint: Zoom model
 
-- [x] `npm test` and `npm run build` pass.
-- [ ] In the browser, opening a second texture does not reload the iframe or close the first document.
-- [ ] Confirm the actual `"done"` sequence and source assignment against Photopea.
-- [ ] Review the message-state behavior before implementing persistence.
+- [x] Focused zoom tests pass.
+- [x] Fit calculation handles portrait, landscape, small and large images, and small available viewports.
 
-### Phase 2: Correct and safe persistence
+### Phase 2: Inspector controls and rendering
 
-- [x] Task 3: Route active-document saves to the source project and reject stale files.
-- [ ] Task 4: Verify multi-document save behavior and finish user-facing statuses.
+- [x] Task 2: Add accessible Inspector controls and apply zoom only to its image stage.
+- [x] Task 3: Verify zoom and panning interactions and state behavior with automated DOM tests; browser-only layout checks remain unavailable in this environment.
 
-### Checkpoint: Ready for review
+### Checkpoint: Inspector behavior
 
-- [x] Each document saves to its original project, independent of the currently selected project.
-- [x] Unknown-source, missing-project, missing-file and stale-content cases do not write data; wrong-origin messages are ignored by the existing origin/window guard.
-- [x] PNG, JPEG, WebP and GIF documents preserve their respective formats.
-- [x] `npm test` and `npm run build` pass.
-- [ ] The browser acceptance flow passes.
+- [x] Unit and focused integration tests pass.
+- [x] Production build succeeds.
+- [ ] Manual browser checks confirm the image zoom does not change page zoom or expose page-level overflow. Chrome DevTools MCP and a local browser executable are unavailable; this check is not claimed as passed.
+
+### Phase 3: User documentation
+
+- [x] Task 4: Add the individual zoom-operation page and update the Inspector guide and private index to 42 active operations.
+
+### Checkpoint: Complete
+
+- [ ] All task acceptance criteria are met; manual browser layout verification is still pending.
+- [ ] Full tests and production build pass.
+- [x] Private documentation has exactly 42 active pages, all indexed once with valid links.
+- [ ] Ready for user review before implementation is considered complete.
 
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Photopea emits messages in a different order than expected | High | Serialize commands, correlate each state transition, and verify with the live editor before persistence integration. |
-| An active document's source or format is misidentified | High | Give every open document an opaque ID and store format per document; save script emits the active document ID before bytes. |
-| Photopea keeps a document open after its project file is deleted or changed | High | Resolve the original project and exact path at save time and compare the current content hash; surface conflicts without writing. |
-| Switching projects updates the wrong project's in-memory UI | Medium | Always persist using the mapped source project; update visible state only when that project is active. |
-| Many large documents consume memory | Medium | Use one Photopea iframe and native document close controls; avoid duplicate editor runtimes. |
-| Photopea does not expose a documented active-tab change event | Medium | Do not display a potentially stale active filename in Laccite; identify the source during save. |
+| Large image dimensions cause layout overflow | High | Keep overflow within the Inspector stage and verify both axes at high zoom. |
+| Zoom state leaks between images or after resize | Medium | Test that a newly opened image starts in Fit mode and that resize only recomputes Fit mode. |
+| Invalid percentage input leaves controls and image out of sync | Medium | Validate/clamp input in a pure helper and test boundary and invalid values. |
+| Header controls crowd the Inspector on narrow screens | Medium | Use compact labels and responsive wrapping; test mobile-width viewports. |
+| User expects a slider or a configurable display mode | Low | Proposed default is minus + editable percentage + plus + Fit; no preference is added unless the user requests it. |
+| Documentation is updated only after the feature and becomes stale | Medium | Make the new operation page and index count an explicit implementation task. |
 
-## Open Questions
+## Verificación pendiente
 
-- If the user attempts to save after the source content changed, the application will reject the save. Reopening the current version is the recovery path; automatic merge is out of scope.
-- If Photopea's actual message ordering differs from the documented API, stop at the checkpoint and revise the protocol/spec before continuing.
+- Interaction and bounds were approved before implementation: `− / percentage / + / Ajustar`, 10%–800%, 10% steps, reset to Fit on image change.
+- Browser verification should use `/browser-testing-with-devtools` if available. If unavailable, record that limitation and do not claim browser checks passed.
 
 ## Implementation Commands
 
-Run from `studio/`:
+From the repository root:
 
 ```sh
-npm test
-npm run build
-npm run dev -- --port 5173
+npm --prefix studio test -- image-zoom.test.ts
+npm --prefix studio test
+npm --prefix studio run build
 ```
 
 ## Current Status
 
-Tasks 1–3 are implemented. The complete automated test suite and production build pass; task 4 remains open for interactive browser verification at `http://localhost:5173/`.
+The approved zoom feature and image panning are implemented. Focused model, control, and panning tests and the production build pass. Browser-only visual checks remain pending because neither Chrome DevTools MCP nor a local browser executable is available in this environment.

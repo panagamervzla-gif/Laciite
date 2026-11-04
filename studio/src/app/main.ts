@@ -2,6 +2,8 @@ import './styles.css';
 import { bindBrowserSearch } from './browser-search';
 import { setExplorerMenuEnabled } from './explorer-menu';
 import { bindFileMenu } from './file-menu';
+import { bindImagePanControls } from './image-pan-controls';
+import { bindImageZoomControls } from './image-zoom-controls';
 import { bindResourceActivation } from './resource-activation';
 import { createResourceCardMenu } from './resource-card-menu';
 import { clampPaneWidth, getNotesPaneWidthBounds } from './notes-pane-resize';
@@ -133,6 +135,7 @@ const photopeaFileName = document.querySelector<HTMLElement>('#photopeaFileName'
 const photopeaStatus = document.querySelector<HTMLElement>('#photopeaStatus')!;
 const saveFromPhotopeaButton = document.querySelector<HTMLButtonElement>('#saveFromPhotopeaButton')!;
 const photopeaLoadingOverlay = document.querySelector<HTMLElement>('#photopeaLoadingOverlay')!;
+const inspectorStage = document.querySelector<HTMLElement>('.inspector-stage')!;
 const inspectorImage = document.querySelector<HTMLImageElement>('#inspectorImage')!;
 const inspectorFileName = document.querySelector<HTMLElement>('#inspectorFileName')!;
 const inspectorFilePath = document.querySelector<HTMLElement>('#inspectorFilePath')!;
@@ -140,6 +143,16 @@ const inspectorDimensions = document.querySelector<HTMLElement>('#inspectorDimen
 const inspectorFormat = document.querySelector<HTMLElement>('#inspectorFormat')!;
 const inspectorSize = document.querySelector<HTMLElement>('#inspectorSize')!;
 const inspectorOpenEditor = document.querySelector<HTMLButtonElement>('#inspectorOpenEditor')!;
+const inspectorPan = bindImagePanControls(inspectorStage);
+const inspectorZoom = bindImageZoomControls({
+  stage: inspectorStage,
+  image: inspectorImage,
+  decreaseButton: document.querySelector<HTMLButtonElement>('#inspectorZoomDecrease')!,
+  percentageInput: document.querySelector<HTMLInputElement>('#inspectorZoomPercent')!,
+  increaseButton: document.querySelector<HTMLButtonElement>('#inspectorZoomIncrease')!,
+  fitButton: document.querySelector<HTMLButtonElement>('#inspectorZoomFit')!,
+  onZoomChange: inspectorPan.refresh
+});
 const browserSearchToggle = document.querySelector<HTMLButtonElement>('#browserSearchToggle')!;
 const browserSearch = document.querySelector<HTMLInputElement>('#browserSearch')!;
 const closeBrowserSearch = bindBrowserSearch(browserSearchToggle, browserSearch);
@@ -1390,16 +1403,20 @@ function openInspector(path: string): void {
   inspectorFormat.textContent = file.mimeType.toUpperCase();
   inspectorSize.textContent = formatFileSize(file.blob.size);
   inspectorImage.alt = resourceName(path);
+  inspectorZoom.resetForImage();
   inspectorImage.onload = () => {
-    if (inspectorPath === path) inspectorDimensions.textContent = `${inspectorImage.naturalWidth} × ${inspectorImage.naturalHeight} px`;
+    if (inspectorPath === path) {
+      inspectorDimensions.textContent = `${inspectorImage.naturalWidth} × ${inspectorImage.naturalHeight} px`;
+      inspectorZoom.fitToStage();
+    }
   };
   inspectorImage.onerror = () => {
     if (inspectorPath === path) inspectorDimensions.textContent = 'No se pudo leer la imagen';
   };
-  inspectorImage.src = inspectorObjectUrl;
   managerContent.hidden = true;
   editorView.hidden = true;
   inspectorView.hidden = false;
+  inspectorImage.src = inspectorObjectUrl;
   managerTab.classList.remove('active');
   managerTab.removeAttribute('aria-current');
   openPhotopeaButton.classList.remove('active');
@@ -1951,6 +1968,10 @@ window.addEventListener('resize', () => {
     if (!notesPane.hidden && window.innerWidth > 700) {
       setNotesPaneWidth(notesPane.getBoundingClientRect().width);
     }
+  }
+  if (!inspectorView.hidden) {
+    inspectorZoom.recalculateIfFitting();
+    inspectorPan.refresh();
   }
 });
 toggleFileSearchButton.addEventListener('click', () => {

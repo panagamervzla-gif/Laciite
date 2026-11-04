@@ -129,8 +129,18 @@
             <div class="photopea-loading-overlay" id="photopeaLoadingOverlay" role="status" hidden>Preparando documento de Photopea…</div>
           </section>
           <section class="inspector-view" id="inspectorView" aria-label="Inspector de imagen" hidden>
-            <header class="inspector-toolbar"><div><strong id="inspectorFileName">Inspector</strong><span id="inspectorFilePath"></span></div><button class="button button-quiet button-small" id="inspectorOpenEditor" type="button">Abrir en Photopea</button></header>
-            <div class="inspector-stage"><img id="inspectorImage" alt=""></div>
+            <header class="inspector-toolbar">
+              <div class="inspector-heading"><strong id="inspectorFileName">Inspector</strong><span id="inspectorFilePath"></span></div>
+              <div class="inspector-zoom-controls" role="group" aria-label="Controles de zoom">
+                <button class="button button-quiet button-small" id="inspectorZoomDecrease" type="button" aria-label="Reducir zoom" title="Reducir zoom">−</button>
+                <input id="inspectorZoomPercent" type="number" min="10" max="800" step="1" value="100" aria-label="Porcentaje de zoom de la imagen">
+                <span aria-hidden="true">%</span>
+                <button class="button button-quiet button-small" id="inspectorZoomIncrease" type="button" aria-label="Ampliar zoom" title="Ampliar zoom">+</button>
+                <button class="button button-quiet button-small" id="inspectorZoomFit" type="button">Ajustar</button>
+              </div>
+              <button class="button button-quiet button-small" id="inspectorOpenEditor" type="button">Abrir en Photopea</button>
+            </header>
+            <div class="inspector-stage" role="region" aria-label="Previsualización de imagen; arrastra para desplazarte y usa las flechas del teclado" tabindex="0"><img id="inspectorImage" alt="" draggable="false"></div>
             <footer class="inspector-status"><span id="inspectorDimensions">Dimensiones</span><span id="inspectorFormat">Formato</span><span id="inspectorSize">Tamaño</span></footer>
           </section>
           </div>
